@@ -1,0 +1,10 @@
+.vscode/
+.idea/
+*.out
+
+
+# Rust gitignore
+*.lock
+marlin_zsk/target
+marlin_zsk/debug
+marlin_zsk/Cargo.lock
