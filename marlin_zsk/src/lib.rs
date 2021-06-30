@@ -22,6 +22,7 @@ struct DataQualityCircuit<F: Field> {
 // Note that due to the R1CS constrain system, the concrete constrain should
 // encoded to <A, w> * <B, w> = <C, w> where w is the private witness vector,
 // A, B, C are corrsponding coefficients.
+// The final result is computed as: data-mu+3*sigma
 impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for DataQualityCircuit<ConstraintF> {
     fn generate_constraints(
         self,
@@ -43,8 +44,8 @@ impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for DataQualityCircu
 
             Ok(sigma)
         })?;
-        let one = cs.new_input_variable(|| Ok(ConstraintF::one()))?;
-        let out = cs.new_witness_variable(|| {
+        let one = cs.new_witness_variable(|| Ok(ConstraintF::one()))?;
+        let out = cs.new_input_variable(|| {
             let mut data_quality = self.data_quality.ok_or(SynthesisError::AssignmentMissing)?;
             let mu = self.mu.ok_or(SynthesisError::AssignmentMissing)?;
             data_quality.sub_assign(&mu);
@@ -67,23 +68,20 @@ impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for DataQualityCircu
 }
 
 #[no_mangle]
-pub extern "C" fn verify() -> bool {
+pub extern "C" fn verify(mu: u32, sigma: u32, data: u32, output: u32) -> bool {
 
     let rng = &mut ark_std::test_rng();
 
     let universal_srs = MarlinInst::universal_setup(3, 7, 3, rng).unwrap();
     let circ = DataQualityCircuit {
-        mu: Some(Fr::from(0u128)),
-        sigma: Some(Fr::from(25u128)),
-        data_quality: Some(Fr::from(100u128)),
+        mu: Some(Fr::from(mu as u128)),
+        sigma: Some(Fr::from(sigma as u128)),
+        data_quality: Some(Fr::from(data as u128)),
         num_constraints: 3,
         num_variables: 7,
     };
     let (index_pk, index_vk) = MarlinInst::index(&universal_srs, circ.clone()).unwrap();
-    println!("Called index");
 
     let proof = MarlinInst::prove(&index_pk, circ, rng).unwrap();
-    println!("Called prover");
-
-    MarlinInst::verify(&index_vk, &[Fr::from(1u128)], &proof, rng).unwrap()
+    MarlinInst::verify(&index_vk, &[Fr::from(output as u128)], &proof, rng).unwrap()
 }
