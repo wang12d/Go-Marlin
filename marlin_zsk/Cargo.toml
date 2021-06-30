@@ -1,0 +1,14 @@
+[package]
+name = "marlin_zsk"
+version = "0.1.0"
+authors = ["heng <awd1232009@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+ark-marlin = {version = "^0.3.0"}
+
+[lib]
+crate-type = ["cdylib"]
