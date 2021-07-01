@@ -18,11 +18,17 @@ struct DataQualityCircuit<F: Field> {
     num_variables: usize,
 }
 
+const NUM_CONSTRAINTS: usize = 5;
+const NUM_VARIABLES: usize = 9;
+const ONE: usize = 1;
 // Implentation of the three sigma rule for evaluating data quality
 // Note that due to the R1CS constrain system, the concrete constrain should
 // encoded to <A, w> * <B, w> = <C, w> where w is the private witness vector,
-// A, B, C are corrsponding coefficients.
-// The final result is computed as: data-mu+3*sigma
+// A, B, C are corrsponding coefficients, <a, b> means the dot product of vector a and b.
+// The final result is computed as: {
+//                              out_add = data-mu+3*sigma
+//                              out_minus = data-mu-3*sigma
+//                            }
 impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for DataQualityCircuit<ConstraintF> {
     fn generate_constraints(
         self,
@@ -100,16 +106,16 @@ pub extern "C" fn verify(mu: u32, sigma: u32, data: u32, output_one: u32, output
 
     let rng = &mut ark_std::test_rng();
 
-    let universal_srs = MarlinInst::universal_setup(5, 9, 8, rng).unwrap();
+    let universal_srs = MarlinInst::universal_setup(NUM_CONSTRAINTS, NUM_VARIABLES, NUM_VARIABLES, rng).unwrap();
     let circ = DataQualityCircuit {
         mu: Some(Fr::from(mu as u128)),
         sigma: Some(Fr::from(sigma as u128)),
         data_quality: Some(Fr::from(data as u128)),
-        num_constraints: 5,
-        num_variables: 9,
+        num_constraints: NUM_CONSTRAINTS,
+        num_variables: NUM_VARIABLES,
     };
     let (index_pk, index_vk) = MarlinInst::index(&universal_srs, circ.clone()).unwrap();
 
     let proof = MarlinInst::prove(&index_pk, circ, rng).unwrap();
-    MarlinInst::verify(&index_vk, &[Fr::from(1 as u128), Fr::from(output_one as u128), Fr::from(output_two as u128)], &proof, rng).unwrap()
+    MarlinInst::verify(&index_vk, &[Fr::from(ONE as u128), Fr::from(output_one as u128), Fr::from(output_two as u128)], &proof, rng).unwrap()
 }
