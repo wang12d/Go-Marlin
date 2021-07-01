@@ -2,10 +2,8 @@ use ark_marlin::{Marlin, Proof, IndexVerifierKey};
 use ark_bls12_381::{Bls12_381, Fr};
 use ark_poly::univariate::DensePolynomial;
 use ark_serialize::*;
-use ark_poly_commit::PolynomialCommitment;
-use ark_std::rand::rngs::StdRng;
 use ark_poly_commit::marlin_pc::MarlinKZG10;
-use ark_ff::{PrimeField, Field};
+use ark_ff::Field;
 use ark_relations::{lc, r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError}};
 use blake2::Blake2s;
 
