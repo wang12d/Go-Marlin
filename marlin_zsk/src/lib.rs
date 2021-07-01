@@ -1,8 +1,11 @@
-use ark_marlin::Marlin;
+use ark_marlin::{Marlin, Proof, IndexVerifierKey};
 use ark_bls12_381::{Bls12_381, Fr};
 use ark_poly::univariate::DensePolynomial;
+use ark_serialize::*;
+use ark_poly_commit::PolynomialCommitment;
+use ark_std::rand::rngs::StdRng;
 use ark_poly_commit::marlin_pc::MarlinKZG10;
-use ark_ff::Field;
+use ark_ff::{PrimeField, Field};
 use ark_relations::{lc, r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError}};
 use blake2::Blake2s;
 
@@ -18,9 +21,20 @@ struct DataQualityCircuit<F: Field> {
     num_variables: usize,
 }
 
+mod test;
+
+#[repr(C)]
+pub struct ProofAndVerifyKey {
+    pub proof: Vec<u8>,
+    pub proof_size: usize,
+    pub verify_key: Vec<u8>,
+    pub verify_key_size: usize,
+}
+
 const NUM_CONSTRAINTS: usize = 5;
 const NUM_VARIABLES: usize = 9;
 const ONE: usize = 1;
+
 // Implentation of the three sigma rule for evaluating data quality
 // Note that due to the R1CS constrain system, the concrete constrain should
 // encoded to <A, w> * <B, w> = <C, w> where w is the private witness vector,
@@ -118,4 +132,48 @@ pub extern "C" fn verify(mu: u32, sigma: u32, data: u32, output_one: u32, output
 
     let proof = MarlinInst::prove(&index_pk, circ, rng).unwrap();
     MarlinInst::verify(&index_vk, &[Fr::from(ONE as u128), Fr::from(output_one as u128), Fr::from(output_two as u128)], &proof, rng).unwrap()
+}
+
+#[no_mangle]
+pub extern "C" fn generate_proof(mu: u32, sigma: u32, data: u32) -> ProofAndVerifyKey
+{
+    
+    let rng = &mut ark_std::test_rng();
+
+    let universal_srs = MarlinInst::universal_setup(NUM_CONSTRAINTS, NUM_VARIABLES, NUM_VARIABLES, rng).unwrap();
+    let circ = DataQualityCircuit {
+        mu: Some(Fr::from(mu as u128)),
+        sigma: Some(Fr::from(sigma as u128)),
+        data_quality: Some(Fr::from(data as u128)),
+        num_constraints: NUM_CONSTRAINTS,
+        num_variables: NUM_VARIABLES,
+    };
+    let (index_pk, index_vk) = MarlinInst::index(&universal_srs, circ.clone()).unwrap();
+
+    let proof = MarlinInst::prove(&index_pk, circ, rng).unwrap();
+    let mut vec_proof: Vec<u8> = Vec::new();
+    proof.serialize(&mut vec_proof).unwrap();
+    let proof_size = proof.serialized_size();
+    let mut vec_vk = Vec::new();
+    index_vk.serialize(&mut vec_vk).unwrap();
+    let index_vk_size = index_vk.serialized_size();
+    ProofAndVerifyKey {
+        proof: vec_proof,
+        proof_size: proof_size,
+        verify_key: vec_vk,
+        verify_key_size: index_vk_size,
+    }
+}
+
+
+#[no_mangle]
+pub extern "C" fn verify_proof(out_one: u32, out_two: u32, proof_and_key: ProofAndVerifyKey) -> bool
+{
+    let rng = &mut ark_std::test_rng();
+    let vec_proof = proof_and_key.proof.clone();
+    let proof = Proof::deserialize(&vec_proof[..]).unwrap();
+    let vec_verify_key = proof_and_key.verify_key.clone();
+    let vk = IndexVerifierKey::deserialize(&vec_verify_key[..]).unwrap();
+    MarlinInst::verify(&vk, &[Fr::from(ONE as u128), Fr::from(out_one as u128), Fr::from(out_two as u128)], 
+        &proof, rng).unwrap()
 }
