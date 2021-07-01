@@ -44,8 +44,34 @@ impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for DataQualityCircu
 
             Ok(sigma)
         })?;
-        let one = cs.new_witness_variable(|| Ok(ConstraintF::one()))?;
-        let out = cs.new_input_variable(|| {
+
+        let w3 = cs.new_witness_variable(|| {
+            let mut sigma = self.sigma.ok_or(SynthesisError::AssignmentMissing)?;
+            let three = ConstraintF::one() + ConstraintF::one() + ConstraintF::one();
+            let two = ConstraintF::one() + ConstraintF::one();
+            sigma.mul_assign(&three);
+            sigma.mul_assign(&two);
+            
+            Ok(sigma)
+
+        })?;
+
+        let one = cs.new_input_variable(|| Ok(ConstraintF::one()))?;
+
+        let out_minus = cs.new_input_variable(|| {
+            let mut data_quality = self.data_quality.ok_or(SynthesisError::AssignmentMissing)?;
+            let mu = self.mu.ok_or(SynthesisError::AssignmentMissing)?;
+            data_quality.sub_assign(&mu);
+            let mut sigma = self.sigma.ok_or(SynthesisError::AssignmentMissing)?;
+            let three = ConstraintF::one() + ConstraintF::one() + ConstraintF::one();
+            sigma.mul_assign(&three);
+
+            data_quality -= &sigma;
+
+            Ok(data_quality)
+        })?;
+        
+        let out_add = cs.new_input_variable(|| {
             let mut data_quality = self.data_quality.ok_or(SynthesisError::AssignmentMissing)?;
             let mu = self.mu.ok_or(SynthesisError::AssignmentMissing)?;
             data_quality.sub_assign(&mu);
@@ -57,31 +83,33 @@ impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for DataQualityCircu
 
             Ok(data_quality)
         })?;
-        
+
         let three = ConstraintF::one() + ConstraintF::one() + ConstraintF::one();
         cs.enforce_constraint(lc!() + (ConstraintF::one(), mu) + (ConstraintF::one(), w1), lc!() + (ConstraintF::one(), one), lc!() + (ConstraintF::one(), data_quality))?;
         cs.enforce_constraint(lc!() + (three, one), lc!() + (ConstraintF::one(), sigma), lc!() + (ConstraintF::one(), w2))?;
-        cs.enforce_constraint(lc!() + (ConstraintF::one(), w1) + (ConstraintF::one(), w2), lc!() + (ConstraintF::one(), one), lc!() + (ConstraintF::one(), out))?;
+        cs.enforce_constraint(lc!() + (ConstraintF::one(), w2) + (ConstraintF::one(), out_minus), lc!() + (ConstraintF::one(), one), lc!() + (ConstraintF::one(), w1))?;
+        cs.enforce_constraint(lc!() + (ConstraintF::one(), w1) + (ConstraintF::one(), w2), lc!() + (ConstraintF::one(), one), lc!() + (ConstraintF::one(), out_add))?;
+        cs.enforce_constraint(lc!() + (ConstraintF::one(), w3) + (ConstraintF::one(), out_minus), lc!() + (ConstraintF::one(), one), lc!() + (ConstraintF::one(), out_add))?;
 
         Ok(())
     }
 }
 
 #[no_mangle]
-pub extern "C" fn verify(mu: u32, sigma: u32, data: u32, output: u32) -> bool {
+pub extern "C" fn verify(mu: u32, sigma: u32, data: u32, output_one: u32, output_two: u32) -> bool {
 
     let rng = &mut ark_std::test_rng();
 
-    let universal_srs = MarlinInst::universal_setup(3, 7, 3, rng).unwrap();
+    let universal_srs = MarlinInst::universal_setup(5, 9, 8, rng).unwrap();
     let circ = DataQualityCircuit {
         mu: Some(Fr::from(mu as u128)),
         sigma: Some(Fr::from(sigma as u128)),
         data_quality: Some(Fr::from(data as u128)),
-        num_constraints: 3,
-        num_variables: 7,
+        num_constraints: 5,
+        num_variables: 9,
     };
     let (index_pk, index_vk) = MarlinInst::index(&universal_srs, circ.clone()).unwrap();
 
     let proof = MarlinInst::prove(&index_pk, circ, rng).unwrap();
-    MarlinInst::verify(&index_vk, &[Fr::from(output as u128)], &proof, rng).unwrap()
+    MarlinInst::verify(&index_vk, &[Fr::from(1 as u128), Fr::from(output_one as u128), Fr::from(output_two as u128)], &proof, rng).unwrap()
 }

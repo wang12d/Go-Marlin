@@ -7,6 +7,8 @@ import "C"
 import "fmt"
 
 func main() {
-	fmt.Printf("%v\n", C.verify(50, 25, 100, 25))
-	fmt.Printf("%v\n", C.verify(50, 25, 100, 125))
+	fmt.Printf("%v\n", C.verify(0, 25, 100, 20, 175))
+	fmt.Printf("%v\n", C.verify(0, 25, 100, 24, 160))
+	fmt.Printf("%v\n", C.verify(0, 25, 100, 23, 150))
+	fmt.Printf("%v\n", C.verify(0, 25, 100, 25, 175))
 }
