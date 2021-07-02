@@ -15,5 +15,5 @@ func main() {
 	proofAndKey := C.generate_proof(0, 25, 100)
 	fmt.Printf("Proof and Key: %T\n", proofAndKey)
 	fmt.Printf("Proof and Key: %v\n", proofAndKey)
-	fmt.Printf("Verify: %v\n", C.verify_proof(25, 175, proofAndKey))
+	// fmt.Printf("Verify: %v\n", C.verify_proof(25, 175, proofAndKey))
 }
