@@ -1,3 +1,5 @@
+use std::ffi::{CString, CStr};
+use libc::c_char;
 use ark_bls12_381::{Bls12_381, Fr};
 use ark_marlin::{Marlin, Proof, IndexVerifierKey};
 use ark_poly::univariate::DensePolynomial;
@@ -6,6 +8,7 @@ use ark_poly_commit::marlin_pc::MarlinKZG10;
 use ark_ff::Field;
 use ark_relations::{lc, r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError}};
 use blake2::Blake2s;
+use hex::{encode, decode};
 
 type MultiPC = MarlinKZG10<Bls12_381, DensePolynomial<Fr>>;
 type MarlinInst = Marlin<Fr, MultiPC, Blake2s>;
@@ -23,9 +26,9 @@ mod test;
 
 #[repr(C)]
 pub struct ProofAndVerifyKey {
-    pub proof: *mut u8,
+    pub proof: *const c_char,
     pub proof_size: usize,
-    pub verify_key: *mut u8,
+    pub verify_key: *const c_char,
     pub verify_key_size: usize,
 }
 
@@ -152,30 +155,36 @@ pub extern "C" fn generate_proof(mu: u32, sigma: u32, data: u32) -> ProofAndVeri
     let mut vec_proof: Vec<u8> = Vec::new();
     proof.serialize(&mut vec_proof).unwrap();
     let proof_size = proof.serialized_size();
-    let box_vec_proof = Box::new(vec_proof);
+    let box_vec_proof_in_hex = CString::new(encode(vec_proof)).unwrap();
     let mut vec_vk = Vec::new();
     index_vk.serialize(&mut vec_vk).unwrap();
     let index_vk_size = index_vk.serialized_size();
-    let box_vec_vk = Box::new(vec_vk);
+    let box_vec_vk_in_hex = CString::new(encode(vec_vk)).unwrap();
     ProofAndVerifyKey {
-        proof: Box::into_raw(box_vec_proof) as *mut u8,
+        proof: box_vec_proof_in_hex.into_raw(),
         proof_size: proof_size,
-        verify_key: Box::into_raw(box_vec_vk) as *mut u8, 
+        verify_key: box_vec_vk_in_hex.into_raw(), 
         verify_key_size: index_vk_size,
     }
 }
 
-
 #[no_mangle]
-pub extern "C" fn verify_proof(out_one: u32, out_two: u32, proof_and_key: ProofAndVerifyKey) -> bool
+pub extern "C" fn verify_proof(out_one: u32, out_two: u32, proof: *const c_char, vk: *const c_char) -> bool
 {
     let rng = &mut ark_std::test_rng();
-    let box_vec_proof = unsafe{ Box::from_raw(proof_and_key.proof as *mut Vec<u8>) };
-    let vec_proof = *box_vec_proof;
-    let proof = Proof::deserialize(&vec_proof[..]).unwrap();
-    let box_vec_verify_key = unsafe{ Box::from_raw(proof_and_key.verify_key as *mut Vec<u8>) };
-    let vec_verify_key = *box_vec_verify_key;
-    let vk = IndexVerifierKey::deserialize(&vec_verify_key[..]).unwrap();
+    let proof_cstr = unsafe {CStr::from_ptr(proof)};
+    let proof_decode = decode(proof_cstr.to_str().unwrap()).unwrap();
+    let proof = Proof::deserialize(&proof_decode[..]).unwrap();
+    let vk_cstr = unsafe {CStr::from_ptr(vk)};
+    let vk_decode = decode(vk_cstr.to_str().unwrap()).unwrap();
+    let vk = IndexVerifierKey::deserialize(&vk_decode[..]).unwrap();
     MarlinInst::verify(&vk, &[Fr::from(ONE as u128), Fr::from(out_one as u128), Fr::from(out_two as u128)], 
         &proof, rng).unwrap()
+}
+
+#[no_mangle]
+pub extern "C" fn free_proof_and_verify(proof: *const c_char, vk: *const c_char)
+{
+    let _ = unsafe {CString::from_raw(proof as *mut _)};
+    let _ = unsafe {CString::from_raw(vk as *mut _)};
 }
