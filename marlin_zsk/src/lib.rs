@@ -1,6 +1,7 @@
-use ark_marlin::Marlin;
 use ark_bls12_381::{Bls12_381, Fr};
+use ark_marlin::{Marlin, Proof, IndexVerifierKey};
 use ark_poly::univariate::DensePolynomial;
+use ark_serialize::*;
 use ark_poly_commit::marlin_pc::MarlinKZG10;
 use ark_ff::Field;
 use ark_relations::{lc, r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError}};
@@ -18,11 +19,28 @@ struct DataQualityCircuit<F: Field> {
     num_variables: usize,
 }
 
+mod test;
+
+#[repr(C)]
+pub struct ProofAndVerifyKey {
+    pub proof: *mut u8,
+    pub proof_size: usize,
+    pub verify_key: *mut u8,
+    pub verify_key_size: usize,
+}
+
+const NUM_CONSTRAINTS: usize = 5;
+const NUM_VARIABLES: usize = 9;
+const ONE: usize = 1;
+
 // Implentation of the three sigma rule for evaluating data quality
 // Note that due to the R1CS constrain system, the concrete constrain should
 // encoded to <A, w> * <B, w> = <C, w> where w is the private witness vector,
-// A, B, C are corrsponding coefficients.
-// The final result is computed as: data-mu+3*sigma
+// A, B, C are corrsponding coefficients, <a, b> means the dot product of vector a and b.
+// The final result is computed as: {
+//                              out_add = data-mu+3*sigma
+//                              out_minus = data-mu-3*sigma
+//                            }
 impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for DataQualityCircuit<ConstraintF> {
     fn generate_constraints(
         self,
@@ -100,16 +118,64 @@ pub extern "C" fn verify(mu: u32, sigma: u32, data: u32, output_one: u32, output
 
     let rng = &mut ark_std::test_rng();
 
-    let universal_srs = MarlinInst::universal_setup(5, 9, 8, rng).unwrap();
+    let universal_srs = MarlinInst::universal_setup(NUM_CONSTRAINTS, NUM_VARIABLES, NUM_VARIABLES, rng).unwrap();
     let circ = DataQualityCircuit {
         mu: Some(Fr::from(mu as u128)),
         sigma: Some(Fr::from(sigma as u128)),
         data_quality: Some(Fr::from(data as u128)),
-        num_constraints: 5,
-        num_variables: 9,
+        num_constraints: NUM_CONSTRAINTS,
+        num_variables: NUM_VARIABLES,
     };
     let (index_pk, index_vk) = MarlinInst::index(&universal_srs, circ.clone()).unwrap();
 
     let proof = MarlinInst::prove(&index_pk, circ, rng).unwrap();
-    MarlinInst::verify(&index_vk, &[Fr::from(1 as u128), Fr::from(output_one as u128), Fr::from(output_two as u128)], &proof, rng).unwrap()
+    MarlinInst::verify(&index_vk, &[Fr::from(ONE as u128), Fr::from(output_one as u128), Fr::from(output_two as u128)], &proof, rng).unwrap()
+}
+
+#[no_mangle]
+pub extern "C" fn generate_proof(mu: u32, sigma: u32, data: u32) -> ProofAndVerifyKey
+{
+    
+    let rng = &mut ark_std::test_rng();
+
+    let universal_srs = MarlinInst::universal_setup(NUM_CONSTRAINTS, NUM_VARIABLES, NUM_VARIABLES, rng).unwrap();
+    let circ = DataQualityCircuit {
+        mu: Some(Fr::from(mu as u128)),
+        sigma: Some(Fr::from(sigma as u128)),
+        data_quality: Some(Fr::from(data as u128)),
+        num_constraints: NUM_CONSTRAINTS,
+        num_variables: NUM_VARIABLES,
+    };
+    let (index_pk, index_vk) = MarlinInst::index(&universal_srs, circ.clone()).unwrap();
+
+    let proof = MarlinInst::prove(&index_pk, circ, rng).unwrap();
+    let mut vec_proof: Vec<u8> = Vec::new();
+    proof.serialize(&mut vec_proof).unwrap();
+    let proof_size = proof.serialized_size();
+    let box_vec_proof = Box::new(vec_proof);
+    let mut vec_vk = Vec::new();
+    index_vk.serialize(&mut vec_vk).unwrap();
+    let index_vk_size = index_vk.serialized_size();
+    let box_vec_vk = Box::new(vec_vk);
+    ProofAndVerifyKey {
+        proof: Box::into_raw(box_vec_proof) as *mut u8,
+        proof_size: proof_size,
+        verify_key: Box::into_raw(box_vec_vk) as *mut u8, 
+        verify_key_size: index_vk_size,
+    }
+}
+
+
+#[no_mangle]
+pub extern "C" fn verify_proof(out_one: u32, out_two: u32, proof_and_key: ProofAndVerifyKey) -> bool
+{
+    let rng = &mut ark_std::test_rng();
+    let box_vec_proof = unsafe{ Box::from_raw(proof_and_key.proof as *mut Vec<u8>) };
+    let vec_proof = *box_vec_proof;
+    let proof = Proof::deserialize(&vec_proof[..]).unwrap();
+    let box_vec_verify_key = unsafe{ Box::from_raw(proof_and_key.verify_key as *mut Vec<u8>) };
+    let vec_verify_key = *box_vec_verify_key;
+    let vk = IndexVerifierKey::deserialize(&vec_verify_key[..]).unwrap();
+    MarlinInst::verify(&vk, &[Fr::from(ONE as u128), Fr::from(out_one as u128), Fr::from(out_two as u128)], 
+        &proof, rng).unwrap()
 }
