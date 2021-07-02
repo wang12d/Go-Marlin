@@ -6,7 +6,6 @@ use ark_poly_commit::marlin_pc::MarlinKZG10;
 use ark_ff::Field;
 use ark_relations::{lc, r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError}};
 use blake2::Blake2s;
-use std::mem;
 
 type MultiPC = MarlinKZG10<Bls12_381, DensePolynomial<Fr>>;
 type MarlinInst = Marlin<Fr, MultiPC, Blake2s>;
@@ -26,10 +25,8 @@ mod test;
 pub struct ProofAndVerifyKey {
     pub proof: *mut u8,
     pub proof_size: usize,
-    pub proof_cap: usize,
     pub verify_key: *mut u8,
     pub verify_key_size: usize,
-    pub verify_key_cap: usize,
 }
 
 const NUM_CONSTRAINTS: usize = 5;
@@ -155,22 +152,16 @@ pub extern "C" fn generate_proof(mu: u32, sigma: u32, data: u32) -> ProofAndVeri
     let mut vec_proof: Vec<u8> = Vec::new();
     proof.serialize(&mut vec_proof).unwrap();
     let proof_size = proof.serialized_size();
+    let box_vec_proof = Box::new(vec_proof);
     let mut vec_vk = Vec::new();
     index_vk.serialize(&mut vec_vk).unwrap();
     let index_vk_size = index_vk.serialized_size();
-    let proof_cap = vec_proof.capacity();
-    let verify_key_cap = vec_vk.capacity();
-    let vec_proof_ptr = vec_proof.as_mut_ptr();
-    let vec_vk_ptr = vec_vk.as_mut_ptr();
-    mem::forget(vec_proof);
-    mem::forget(vec_vk);
+    let box_vec_vk = Box::new(vec_vk);
     ProofAndVerifyKey {
-        proof: vec_proof_ptr,
+        proof: Box::into_raw(box_vec_proof) as *mut u8,
         proof_size: proof_size,
-        proof_cap: proof_cap,
-        verify_key: vec_vk_ptr, 
+        verify_key: Box::into_raw(box_vec_vk) as *mut u8, 
         verify_key_size: index_vk_size,
-        verify_key_cap: verify_key_cap,
     }
 }
 
@@ -179,9 +170,11 @@ pub extern "C" fn generate_proof(mu: u32, sigma: u32, data: u32) -> ProofAndVeri
 pub extern "C" fn verify_proof(out_one: u32, out_two: u32, proof_and_key: ProofAndVerifyKey) -> bool
 {
     let rng = &mut ark_std::test_rng();
-    let vec_proof = unsafe { Vec::from_raw_parts(proof_and_key.proof, proof_and_key.proof_size, proof_and_key.proof_size) };
+    let box_vec_proof = unsafe{ Box::from_raw(proof_and_key.proof as *mut Vec<u8>) };
+    let vec_proof = *box_vec_proof;
     let proof = Proof::deserialize(&vec_proof[..]).unwrap();
-    let vec_verify_key = unsafe { Vec::from_raw_parts(proof_and_key.verify_key, proof_and_key.verify_key_size, proof_and_key.verify_key_size) };
+    let box_vec_verify_key = unsafe{ Box::from_raw(proof_and_key.verify_key as *mut Vec<u8>) };
+    let vec_verify_key = *box_vec_verify_key;
     let vk = IndexVerifierKey::deserialize(&vec_verify_key[..]).unwrap();
     MarlinInst::verify(&vk, &[Fr::from(ONE as u128), Fr::from(out_one as u128), Fr::from(out_two as u128)], 
         &proof, rng).unwrap()
