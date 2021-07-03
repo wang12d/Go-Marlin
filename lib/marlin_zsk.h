@@ -6,9 +6,9 @@ verify(unsigned int mu, unsigned int sigma,
 
 struct ProofAndVerifyKey 
 {
-    unsigned char* proof;
+    unsigned char** proof;
     unsigned int proof_size;
-    unsigned char* verify_key;
+    unsigned char** verify_key;
     unsigned int verify_key_size;
 };
 
