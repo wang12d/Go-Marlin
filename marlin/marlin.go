@@ -22,7 +22,7 @@ type VerifyKey []byte // The verify key of the proof
 // which is out_1 = data - mu - 3*sigmaSquare and out_2 = data - mu + 3*sigmaSquare.
 // Others can verify whether the result is correct by using the generated proof and verify key
 func GenerateProofAndVerifyKey(mu, sigmaSquare, data uint) (proof Proof, verifyKey VerifyKey) {
-	proofAndKey := C.generate_proof(C.uint(mu), C.uint(sigmaSquare), C.uint(data))
+	proofAndKey := C.generate_proof_echain(C.uint(mu), C.uint(sigmaSquare), C.uint(data))
 	defer C.free_proof_and_verify(proofAndKey.proof, proofAndKey.verify_key)
 	encodedProof, encodedVerifyKey := C.GoString(proofAndKey.proof), C.GoString(proofAndKey.verify_key)
 	var err error
@@ -43,6 +43,6 @@ func Verify(proof Proof, verifyKey VerifyKey, publicInputs ...uint) bool {
 		return false
 	}
 	proofHex, verifyKeyHex := C.CString(hex.EncodeToString(proof)), C.CString(hex.EncodeToString(verifyKey))
-	verifyResult := C.verify_proof(C.uint(publicInputs[0]), C.uint(publicInputs[1]), proofHex, verifyKeyHex)
+	verifyResult := C.verify_proof_echain(C.uint(publicInputs[0]), C.uint(publicInputs[1]), proofHex, verifyKeyHex)
 	return bool(verifyResult)
 }
