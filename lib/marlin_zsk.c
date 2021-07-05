@@ -5,11 +5,9 @@
 int
 main()
 {
-   struct ProofAndVerifyKey pvk = generate_proof(0, 25, 100);
+   struct ProofAndVerifyKey pvk = generate_proof_echain(0, 25, 100);
    printf("C proof address: %p\n", (void*) pvk.proof);
-   printf("C proof size: %d\n", pvk.proof_size);
    printf("C verify key address: %p\n", (void*) pvk.verify_key);
-   printf("C verify key size: %d\n", pvk.verify_key_size);
-   printf("Verify result: %d\n", verify_proof(25, 175, pvk));
+   printf("Verify result: %d\n", verify_proof_echain(25, 175, pvk.proof, pvk.verify_key));
    return 0;
 }

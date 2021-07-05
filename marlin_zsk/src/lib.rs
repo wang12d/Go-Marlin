@@ -115,27 +115,7 @@ impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for DataQualityCircu
 }
 
 #[no_mangle]
-pub extern "C" fn verify(mu: u32, sigma: u32, data: u32, output_one: u32, output_two: u32) -> bool {
-
-    let rng = &mut ark_std::test_rng();
-
-    let universal_srs = MarlinInst::universal_setup(NUM_CONSTRAINTS, NUM_VARIABLES, NUM_VARIABLES, rng).unwrap();
-    let circ = DataQualityCircuit {
-        mu: Some(Fr::from(mu as u128)),
-        sigma: Some(Fr::from(sigma as u128)),
-        data_quality: Some(Fr::from(data as u128)),
-        num_constraints: NUM_CONSTRAINTS,
-        num_variables: NUM_VARIABLES,
-    };
-    let (index_pk, index_vk) = MarlinInst::index(&universal_srs, circ.clone()).unwrap();
-
-    let proof = MarlinInst::prove(&index_pk, circ, rng).unwrap();
-    MarlinInst::verify(&index_vk, &[Fr::from(ONE as u128), Fr::from(output_one as u128), Fr::from(output_two as u128)], &proof, rng).unwrap()
-}
-
-#[no_mangle]
-pub extern "C" fn generate_proof(mu: u32, sigma: u32, data: u32) -> ProofAndVerifyKey
-{
+pub extern "C" fn generate_proof_echain(mu: u32, sigma: u32, data: u32) -> ProofAndVerifyKey {
     
     let rng = &mut ark_std::test_rng();
 
@@ -163,8 +143,7 @@ pub extern "C" fn generate_proof(mu: u32, sigma: u32, data: u32) -> ProofAndVeri
 }
 
 #[no_mangle]
-pub extern "C" fn verify_proof(out_one: u32, out_two: u32, proof: *const c_char, vk: *const c_char) -> bool
-{
+pub extern "C" fn verify_proof_echain(out_one: u32, out_two: u32, proof: *const c_char, vk: *const c_char) -> bool {
     let rng = &mut ark_std::test_rng();
     let proof_cstr = unsafe {CStr::from_ptr(proof)};
     let proof_decode = decode(proof_cstr.to_str().unwrap()).unwrap();
@@ -177,8 +156,7 @@ pub extern "C" fn verify_proof(out_one: u32, out_two: u32, proof: *const c_char,
 }
 
 #[no_mangle]
-pub extern "C" fn free_proof_and_verify(proof: *const c_char, vk: *const c_char)
-{
+pub extern "C" fn free_proof_and_verify(proof: *const c_char, vk: *const c_char) {
     let _ = unsafe {CString::from_raw(proof as *mut _)};
     let _ = unsafe {CString::from_raw(vk as *mut _)};
 }
