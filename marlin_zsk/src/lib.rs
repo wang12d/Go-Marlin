@@ -27,9 +27,7 @@ mod test;
 #[repr(C)]
 pub struct ProofAndVerifyKey {
     pub proof: *const c_char,
-    pub proof_size: usize,
     pub verify_key: *const c_char,
-    pub verify_key_size: usize,
 }
 
 const NUM_CONSTRAINTS: usize = 5;
@@ -154,17 +152,13 @@ pub extern "C" fn generate_proof(mu: u32, sigma: u32, data: u32) -> ProofAndVeri
     let proof = MarlinInst::prove(&index_pk, circ, rng).unwrap();
     let mut vec_proof: Vec<u8> = Vec::new();
     proof.serialize(&mut vec_proof).unwrap();
-    let proof_size = proof.serialized_size();
     let box_vec_proof_in_hex = CString::new(encode(vec_proof)).unwrap();
     let mut vec_vk = Vec::new();
     index_vk.serialize(&mut vec_vk).unwrap();
-    let index_vk_size = index_vk.serialized_size();
     let box_vec_vk_in_hex = CString::new(encode(vec_vk)).unwrap();
     ProofAndVerifyKey {
         proof: box_vec_proof_in_hex.into_raw(),
-        proof_size: proof_size,
         verify_key: box_vec_vk_in_hex.into_raw(), 
-        verify_key_size: index_vk_size,
     }
 }
 

@@ -10,9 +10,4 @@ The basic ideal is to using the Rust's foregin language to first convert a **con
 
 In the cloned repository, simple input `make build` in your favorite shell. Then run the `a.out` to run the example program.
 
-## TODO
-
-- [ ] Adding public parameters to create zero knowledge proof
-- [ ] Convert the result Field to C struct
-- [ ] Convert the `ProveKey` and `VerifyKey` to C struct
-- [ ] Convert the proof to C struct
+To use GoMarlin in third package, the compiled dynamic library `lib/libmarlin_sk.so` must able to be found by `go build` to convert the code into runable.
