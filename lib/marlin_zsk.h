@@ -6,9 +6,9 @@ verify(unsigned int mu, unsigned int sigma,
 
 struct ProofAndVerifyKey 
 {
-    unsigned char** proof;
+    const char* proof;
     unsigned int proof_size;
-    unsigned char** verify_key;
+    const char* verify_key;
     unsigned int verify_key_size;
 };
 
@@ -17,4 +17,7 @@ generate_proof(unsigned int mu, unsigned int sigma, unsigned int data);
 
 
 bool 
-verify_proof(unsigned int out_one, unsigned int out_two, struct ProofAndVerifyKey proof_and_key);
+verify_proof(unsigned int out_one, unsigned int out_two, const char* proof, const char* verify_key);
+
+void
+free_proof_and_verify(const char* proof, const char* verify_key);
