@@ -4,8 +4,8 @@ package main
 // #include <stdbool.h>
 // #include <stdlib.h>
 // #include "./lib/marlin_zsk.h"
-// unsigned char to_uchar(unsigned char* ptr, unsigned char move) {
-//	return *(ptr + move);
+// unsigned char to_uchar(unsigned char** ptr, unsigned char move) {
+//	return *(*ptr + move);
 // }
 import "C"
 import "fmt"
