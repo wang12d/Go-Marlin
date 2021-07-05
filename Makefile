@@ -1,6 +1,8 @@
+.PHONY: clean
+
 build: libmarlin_zsk.so
 	cp marlin_zsk/target/release/libmarlin_zsk.so lib/
-	GODEBUG=cgocheck=0 go build -ldflags="-r $(shell pwd)/lib" -o a.out marlin.go
+	go build -ldflags="-r $(shell pwd)/lib" -o a.out main.go
 
 libmarlin_zsk.so:
 	cd marlin_zsk && cargo build --release
