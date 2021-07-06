@@ -1,6 +1,6 @@
 use crate::*;
 use std::marker::PhantomData;
-use ed25519_dalek::{Signature, Verifier, PublicKey, SecretKey};
+use ed25519_dalek::{Signature, Verifier, PublicKey, Keypair};
 use std::convert::TryInto;
 use sha2::Sha256;
 use hmac::{Hmac, NewMac, Mac};
@@ -53,10 +53,10 @@ impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for ZebraLancerCircu
         }; 
         let w1 = cs.new_witness_variable(|| w1.ok_or(SynthesisError::AssignmentMissing))?;
         let pk = PublicKey::from_bytes(&self.pk[..]).unwrap();
-        let sk = SecretKey::from_bytes(&self.sk[..32]).unwrap();
+        let key_pair = Keypair::from_bytes(&self.sk[..]).unwrap();
         let w2 = {
             // Check the sk and public key validity
-            let gpk: PublicKey = (&sk).into(); // From sk generate pk
+            let gpk: PublicKey = key_pair.public; // From sk generate pk
             let mut val = ConstraintF::zero();
             if gpk == pk {
                 val += ConstraintF::one();
