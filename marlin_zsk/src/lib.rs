@@ -5,7 +5,7 @@ use ark_marlin::{Marlin, Proof, IndexVerifierKey};
 use ark_poly::univariate::DensePolynomial;
 use ark_serialize::*;
 use ark_poly_commit::marlin_pc::MarlinKZG10;
-use ark_ff::Field;
+use ark_ff::{biginteger::BigInteger256, Field, FromBytes};
 use ark_relations::{lc, r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError}};
 use blake2::Blake2s;
 use hex::{encode, decode};
@@ -23,6 +23,8 @@ struct DataQualityCircuit<F: Field> {
 }
 
 mod test;
+
+mod zebralancer;
 
 #[repr(C)]
 pub struct ProofAndVerifyKey {
@@ -112,6 +114,11 @@ impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for DataQualityCircu
 
         Ok(())
     }
+}
+
+fn convert_c_hexstr_to_bytes(encoded_c_str: *const c_char) -> Vec<u8> {
+    let encode_str = unsafe {CStr::from_ptr(encoded_c_str)};
+    decode(encode_str.to_str().unwrap()).unwrap()
 }
 
 #[no_mangle]
