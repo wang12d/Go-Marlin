@@ -7,6 +7,8 @@ use hmac::{Hmac, NewMac, Mac};
 
 type HmacSha256 = Hmac<Sha256>;
 
+// Convert bytes encoded big integer 256 to ark-workers BigInteger256,
+// then converts encoded the BigInteger256 to bytes
 fn field_encode_convert(raw_vec: Vec<u8>) -> Vec<u8> {
     let fr_element = Fr::new(BigInteger256::read(&raw_vec[..]).unwrap());
     let mut field_encode = Vec::new();
@@ -135,17 +137,17 @@ pub extern "C" fn generate_proof_zebralancer(prefix: *const c_char,
 #[no_mangle]
 pub extern "C" fn verify_proof_zebralancer(t1: *const c_char, t2: *const c_char, 
         proof: *const c_char, vk: *const c_char) -> bool {
-        let rng = &mut ark_std::test_rng();
-        let proof = {
-            let proof_cstr = unsafe {CStr::from_ptr(proof)};
-            let proof_decode = decode(proof_cstr.to_str().unwrap()).unwrap();                
-            Proof::deserialize(&proof_decode[..]).unwrap()
-        };
-        let vk = {
-            let vk_cstr = unsafe {CStr::from_ptr(vk)};
-            let vk_decode = decode(vk_cstr.to_str().unwrap()).unwrap();
-            IndexVerifierKey::deserialize(&vk_decode[..]).unwrap()
-        };
-        MarlinInst::verify(&vk, &[Fr::new(BigInteger256::read(&convert_c_hexstr_to_bytes(t1)[..]).unwrap()), 
-        Fr::new(BigInteger256::read(&convert_c_hexstr_to_bytes(t2)[..]).unwrap()), Fr::from(1 as u128)], &proof, rng).unwrap()
+    let rng = &mut ark_std::test_rng();
+    let proof = {
+        let proof_cstr = unsafe {CStr::from_ptr(proof)};
+        let proof_decode = decode(proof_cstr.to_str().unwrap()).unwrap();                
+        Proof::deserialize(&proof_decode[..]).unwrap()
+    };
+    let vk = {
+        let vk_cstr = unsafe {CStr::from_ptr(vk)};
+        let vk_decode = decode(vk_cstr.to_str().unwrap()).unwrap();
+        IndexVerifierKey::deserialize(&vk_decode[..]).unwrap()
+    };
+    MarlinInst::verify(&vk, &[Fr::new(BigInteger256::read(&convert_c_hexstr_to_bytes(t1)[..]).unwrap()), 
+    Fr::new(BigInteger256::read(&convert_c_hexstr_to_bytes(t2)[..]).unwrap()), Fr::from(1 as u128)], &proof, rng).unwrap()
 }
