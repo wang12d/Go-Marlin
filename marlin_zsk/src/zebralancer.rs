@@ -7,14 +7,6 @@ use hmac::{Hmac, NewMac, Mac};
 
 type HmacSha256 = Hmac<Sha256>;
 
-// Convert bytes encoded big integer 256 to ark-workers BigInteger256,
-// then converts encoded the BigInteger256 to bytes
-pub fn field_encode_convert(raw_vec: &[u8]) -> Vec<u8> {
-    let fr_element = Fr::new(BigInteger256::read(raw_vec).unwrap());
-    let mut field_encode = Vec::new();
-    fr_element.serialize(&mut field_encode).unwrap();
-    return field_encode;
-}
 
 // The ZebraLacner witness, which is used to prove the sk, pk, cert.
 // Notes that sk, pk and cert are hex encoded c string.
@@ -149,5 +141,5 @@ pub extern "C" fn verify_proof_zebralancer(t1: *const c_char, t2: *const c_char,
         IndexVerifierKey::deserialize(&vk_decode[..]).unwrap()
     };
     MarlinInst::verify(&vk, &[Fr::new(BigInteger256::read(&convert_c_hexstr_to_bytes(t1)[..]).unwrap()), 
-    Fr::new(BigInteger256::read(&convert_c_hexstr_to_bytes(t2)[..]).unwrap()), Fr::from(1 as u128)], &proof, rng).unwrap()
+        Fr::new(BigInteger256::read(&convert_c_hexstr_to_bytes(t2)[..]).unwrap()), Fr::from(1 as u128)], &proof, rng).unwrap()
 }

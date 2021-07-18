@@ -1,6 +1,5 @@
 use crate::*;
 use std::marker::PhantomData;
-use crate::zebralancer::field_encode_convert;
 use rsa::{PublicKey, RSAPublicKey, PaddingScheme};
 use rand::RngCore;
 use rand_core::Error;
@@ -80,7 +79,7 @@ impl <F: Field> ConstraintSynthesizer<F> for CryptoCircuit<F> {
 
 #[no_mangle]
 pub extern "C" fn generate_proof_zebralancer_rewarding(raw_data: *const c_char, public_key: *const c_char, 
-    encrypted_data: *const c_char) {
+    encrypted_data: *const c_char) -> ProofAndVerifyKey {
         let field_bytes = 32; let data_size = 4096; let field_size = 256;
         let num_constraints = {
             let res = data_size / field_size;
@@ -105,9 +104,46 @@ pub extern "C" fn generate_proof_zebralancer_rewarding(raw_data: *const c_char, 
         let (index_pk, index_vk) = MarlinInst::index(&universal_srs, circuit.clone()).unwrap();
         // Now generates the marlin zsk proof
         let proof = MarlinInst::prove(&index_pk, circuit, rng).unwrap();
+        let mut vec_proof: Vec<u8> = Vec::new();
+        proof.serialize(&mut vec_proof).unwrap();
+        let box_vec_proof_in_hex = CString::new(encode(vec_proof)).unwrap();
+        let mut vec_vk = Vec::new();
+        index_vk.serialize(&mut vec_vk).unwrap();
+        let box_vec_vk_in_hex = CString::new(encode(vec_vk)).unwrap();
+        ProofAndVerifyKey {
+            proof: box_vec_proof_in_hex.into_raw(),
+            verify_key: box_vec_vk_in_hex.into_raw(), 
+        }
 }
 
 #[no_mangle]
-pub extern "C" fn verify_proof_zebralancer_rewarding(ciphertext: *const c_char) {
-
+pub extern "C" fn verify_proof_zebralancer_rewarding(ciphertext: *const c_char, proof: *const c_char, 
+    vk: *const c_char) -> bool {
+    let rng = &mut ark_std::test_rng();
+    let proof = {
+        let proof_cstr = unsafe {CStr::from_ptr(proof)};
+        let proof_decode = decode(proof_cstr.to_str().unwrap()).unwrap();                
+        Proof::deserialize(&proof_decode[..]).unwrap()
+    };
+    let vk = {
+        let vk_cstr = unsafe {CStr::from_ptr(vk)};
+        let vk_decode = decode(vk_cstr.to_str().unwrap()).unwrap();
+        IndexVerifierKey::deserialize(&vk_decode[..]).unwrap()
+    };
+    let encrypted_data = {
+        let ciphertext = unsafe {CStr::from_ptr(ciphertext)};
+        hex::decode(ciphertext.to_str().unwrap()).unwrap()
+    };
+    let mut index = 0; let length = encrypted_data.len();
+    let mut inputs = Vec::new();
+    while index < length {
+        let mut last = index + 32; 
+        if last > length {
+            last = length;
+        }
+        let encrypted_field = Fr::read(&field_encode_convert(&encrypted_data[index..last])[..]).expect("failed to read encrypted raw data to field number"); 
+        inputs.push(encrypted_field);
+        index = last;
+    }
+    MarlinInst::verify(&vk, &inputs[..], &proof, rng).unwrap()
 }
