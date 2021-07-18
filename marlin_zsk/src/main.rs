@@ -1,8 +1,7 @@
-use rand::{RngCore, rngs::OsRng};
+use rand::{RngCore};
 use rand_core::{Error};
 use std::convert::TryFrom;
 use rsa::{PublicKey, RSAPrivateKey, RSAPublicKey, PaddingScheme};
-use base64;
 
 
 struct DummyRNG {

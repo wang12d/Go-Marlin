@@ -26,6 +26,10 @@ mod test;
 
 mod zebralancer;
 
+mod crypto;
+
+mod crypto_test;
+
 #[repr(C)]
 pub struct ProofAndVerifyKey {
     pub proof: *const c_char,

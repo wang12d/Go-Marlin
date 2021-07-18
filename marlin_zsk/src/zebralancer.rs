@@ -9,8 +9,8 @@ type HmacSha256 = Hmac<Sha256>;
 
 // Convert bytes encoded big integer 256 to ark-workers BigInteger256,
 // then converts encoded the BigInteger256 to bytes
-fn field_encode_convert(raw_vec: Vec<u8>) -> Vec<u8> {
-    let fr_element = Fr::new(BigInteger256::read(&raw_vec[..]).unwrap());
+pub fn field_encode_convert(raw_vec: &[u8]) -> Vec<u8> {
+    let fr_element = Fr::new(BigInteger256::read(raw_vec).unwrap());
     let mut field_encode = Vec::new();
     fr_element.serialize(&mut field_encode).unwrap();
     return field_encode;
@@ -66,13 +66,13 @@ impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for ZebraLancerCircu
             Some(val)
         };
         let w2 = cs.new_witness_variable(|| w2.ok_or(SynthesisError::AssignmentMissing))?;
-        let t1 = Some(ConstraintF::read(&field_encode_convert(self.t1)[..]).unwrap());
-        let t2 = Some(ConstraintF::read(&field_encode_convert(self.t2)[..]).unwrap());
+        let t1 = Some(ConstraintF::read(&field_encode_convert(&self.t1[..])[..]).unwrap());
+        let t2 = Some(ConstraintF::read(&field_encode_convert(&self.t2[..])[..]).unwrap());
         let w3 = {
             let mut h = HmacSha256::new_from_slice(&self.prefix[..]).expect("HMAC can take key of any size"); 
             h.update(&self.sk[..]);
             let h_bytes = h.finalize().into_bytes();
-            Some(ConstraintF::read(&field_encode_convert(h_bytes.to_vec())[..]).unwrap())
+            Some(ConstraintF::read(&field_encode_convert(&h_bytes.to_vec()[..])[..]).unwrap())
         };
         let w3 = cs.new_witness_variable(|| w3.ok_or(SynthesisError::AssignmentMissing))?;
         let w4 = {
@@ -80,7 +80,7 @@ impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for ZebraLancerCircu
             let mut h = HmacSha256::new_from_slice(&prefix_with_msg[..]).expect("HMAC can take key of any size"); 
             h.update(&self.sk[..]);
             let h_bytes = h.finalize().into_bytes();
-            Some(ConstraintF::read(&field_encode_convert(h_bytes.to_vec())[..]).unwrap())
+            Some(ConstraintF::read(&field_encode_convert(&h_bytes.to_vec()[..])[..]).unwrap())
         };
         let w4 = cs.new_witness_variable(|| w4.ok_or(SynthesisError::AssignmentMissing))?;
         let t1 = cs.new_input_variable(|| t1.ok_or(SynthesisError::AssignmentMissing))?;
