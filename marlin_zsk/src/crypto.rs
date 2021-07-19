@@ -1,5 +1,6 @@
 use crate::*;
 use rsa::{RSAPrivateKey, PublicKey, RSAPublicKey, PaddingScheme};
+use std::convert::TryFrom;
 use rand::RngCore;
 use rand_core::Error;
 
@@ -49,8 +50,14 @@ impl <F: Field> ConstraintSynthesizer<F> for CryptoCircuit<F> {
     let one = cs.new_witness_variable(|| Ok(F::one())).unwrap();
     let mut rng = DummyRNG{};
     // Convert pem encoded string to public key
-    let public_key = RSAPublicKey::from_pkcs1(&self.public_key[..]).expect("failed to parse public key");
-    let private_key = RSAPrivateKey::from_pkcs1(&self.private_key[..]).expect("failed to parse private key");
+    let private_key = {
+        let pem = rsa::pem::parse(&self.private_key).unwrap();
+        RSAPrivateKey::try_from(pem).expect("failed to parse private key")
+    };
+    let public_key = {
+        let pem = rsa::pem::parse(&self.public_key).unwrap();
+        RSAPublicKey::try_from(pem).expect("failed to parse public key")
+    };
     let key_pair = {
         let mut res = F::zero();
         let pk = RSAPublicKey::from(&private_key);
@@ -58,7 +65,7 @@ impl <F: Field> ConstraintSynthesizer<F> for CryptoCircuit<F> {
            res += F::one()
         }
         cs.new_witness_variable(|| Ok(res))?
-    };
+    }; 
     cs.enforce_constraint(lc!()+(F::one(), key_pair), lc!()+(F::one(), one), lc!()+(F::one(), one))?;
     // TODO: According to the Zebralancer paper, this part should be of vector of encrypted data
     /*************************************************************

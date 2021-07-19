@@ -1,7 +1,12 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha512"
+	"crypto/x509"
 	"encoding/hex"
+	"encoding/pem"
 	"fmt"
 	"log"
 
@@ -15,6 +20,14 @@ func decode(hexString string) []byte {
 		log.Fatalf("Invalid hex string: %v\n", hexString)
 	}
 	return res
+}
+
+type DummyReader struct {
+}
+
+func (dr *DummyReader) Read(p []byte) (n int, err error) {
+	n = copy(p, make([]byte, len(p)))
+	return n, err
 }
 
 func main() {
@@ -36,4 +49,29 @@ func main() {
 	fmt.Printf("ZebraLancer verify result: %v\n", marlin.ZebraLancerVerifyProof(t1, t2, proof, vk))
 	t1[0] = t1[0] - 1
 	fmt.Printf("ZebraLancer verify result: %v\n", marlin.ZebraLancerVerifyProof(t1, t2, proof, vk))
+	/************************************************************
+	        Zebralacner Rewarding Verification
+	************************************************************/
+	data := []byte("hello")
+	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
+	privateKeyPem := pem.EncodeToMemory(
+		&pem.Block{
+			Type:  "RSA PRIVATE KEY",
+			Bytes: privateKeyBytes,
+		},
+	)
+
+	publicKeyBytes, _ := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
+	publicKeyPem := pem.EncodeToMemory(
+		&pem.Block{
+			Type:  "PUBLIC KEY",
+			Bytes: publicKeyBytes,
+		},
+	)
+
+	encryptedData, _ := rsa.EncryptOAEP(sha512.New(), &DummyReader{}, &privateKey.PublicKey, data, nil)
+	proof, vk = marlin.ZebraLancerGenerateProofAndVerifyKeyRewarding(0, 25, 100, data, publicKeyPem, privateKeyPem, encryptedData)
+
+	fmt.Printf("Rewarding verify result: %v\n", marlin.ZebraLancerVerifyProofKeyRewarding(25, 175, encryptedData, proof, vk))
 }
