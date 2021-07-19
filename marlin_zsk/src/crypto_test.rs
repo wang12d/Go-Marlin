@@ -58,10 +58,11 @@ SDBwSyWcJQiMNGKujV4cU2BPcikqpukmMh1pewDMy7cRggheClGkmZI=
                                 .expect("Convert public key to CString error");
     let encoded_raw_data = CString::new(hex::encode(data)).unwrap();
     let encoded_enc_data = CString::new(hex::encode(enc_data)).unwrap();
-    let pv = generate_proof_zebralancer_rewarding(encoded_raw_data.as_ptr(), encoded_public_key.as_ptr(), 
+    let pv = generate_proof_zebralancer_rewarding(0, 25, 100,
+        encoded_raw_data.as_ptr(), encoded_public_key.as_ptr(), 
                     encoded_private_key.as_ptr(), encoded_enc_data.as_ptr());
     // Get proof and vk
-    let vfy = verify_proof_zebralancer_rewarding(encoded_enc_data.into_raw(), pv.proof, pv.verify_key);
+    let vfy = verify_proof_zebralancer_rewarding(25, 175, encoded_enc_data.into_raw(), pv.proof, pv.verify_key);
     assert_eq!(vfy, true);
 
     // Test false encryption data
@@ -71,7 +72,7 @@ SDBwSyWcJQiMNGKujV4cU2BPcikqpukmMh1pewDMy7cRggheClGkmZI=
         let enc_data = public_key.encrypt(&mut rng, padding, data).unwrap();
         CString::new(hex::encode(enc_data)).unwrap()
     };
-    let vfy = verify_proof_zebralancer_rewarding(encoded_enc_data.into_raw(), pv.proof, pv.verify_key);
+    let vfy = verify_proof_zebralancer_rewarding(25, 175, encoded_enc_data.into_raw(), pv.proof, pv.verify_key);
     assert_eq!(vfy, false);
     }
 }
