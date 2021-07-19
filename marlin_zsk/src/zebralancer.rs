@@ -141,5 +141,6 @@ pub extern "C" fn verify_proof_zebralancer(t1: *const c_char, t2: *const c_char,
         IndexVerifierKey::deserialize(&vk_decode[..]).unwrap()
     };
     MarlinInst::verify(&vk, &[Fr::new(BigInteger256::read(&convert_c_hexstr_to_bytes(t1)[..]).unwrap()), 
-        Fr::new(BigInteger256::read(&convert_c_hexstr_to_bytes(t2)[..]).unwrap()), Fr::from(1 as u128)], &proof, rng).unwrap()
+        Fr::new(BigInteger256::read(&convert_c_hexstr_to_bytes(t2)[..]).unwrap()), Fr::from(1 as u128)], &proof, rng)
+        .unwrap()
 }

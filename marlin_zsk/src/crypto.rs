@@ -1,6 +1,6 @@
 use crate::*;
 use std::marker::PhantomData;
-use rsa::{PublicKey, RSAPublicKey, PaddingScheme};
+use rsa::{RSAPrivateKey, PublicKey, RSAPublicKey, PaddingScheme};
 use rand::RngCore;
 use rand_core::Error;
 
@@ -30,7 +30,8 @@ impl RngCore for DummyRNG {
 #[derive(Clone)]
 struct CryptoCircuit<F: Field> {
     encrypted_data: Vec<u8>,  // The bytes of encrypted data
-    public_key: Vec<u8>,     // The bytes of rsa secret key, with key size 2048 bits
+    public_key: Vec<u8>,     // The bytes of rsa public key, with key size 2048 bits
+    private_key: Vec<u8>,   // The bytes of rsa private key
     raw_data: Vec<u8>,       // The bytes of raw data
     num_constraints: usize,
     num_variables: usize,
@@ -45,15 +46,30 @@ impl <F: Field> ConstraintSynthesizer<F> for CryptoCircuit<F> {
         cs: ConstraintSystemRef<F>
     ) -> Result<(), SynthesisError> {
     // Decoding the public key
+    let one = cs.new_witness_variable(|| Ok(F::one())).unwrap();
     let mut rng = DummyRNG{};
     // Convert pem encoded string to public key
-    let public_key = RSAPublicKey::from_pkcs1(&self.public_key[..]).expect("failed to parse key");
+    let public_key = RSAPublicKey::from_pkcs1(&self.public_key[..]).expect("failed to parse public key");
+    let private_key = RSAPrivateKey::from_pkcs1(&self.private_key[..]).expect("failed to parse private key");
+    let key_pair = {
+        let mut res = F::zero();
+        let pk = RSAPublicKey::from(&private_key);
+        if pk == public_key {
+           res += F::one()
+        }
+        cs.new_witness_variable(|| Ok(res))?
+    };
+    cs.enforce_constraint(lc!()+(F::one(), key_pair), lc!()+(F::one(), one), lc!()+(F::one(), one))?;
+    // TODO: According to the Zebralancer paper, this part should be of vector of encrypted data
+    /*************************************************************
+     ***********The Marlin ZSK Proof of encryption bytes**********
+    *************************************************************/
     let padding = PaddingScheme::new_oaep::<sha2::Sha512>();
     // RSA OAEP decryption
     let encrypted_data = public_key.encrypt(&mut rng, padding, &self.raw_data).expect("failed to decrypt");
     // Now comparing the decrypted data with raw data
     let length = encrypted_data.len();
-    let mut index = 0; let one = cs.new_witness_variable(|| Ok(F::one())).unwrap();
+    let mut index = 0; 
     // The encoding of encrypted bytes, converts them to a field element
     // and compare the equality of each number
     let mut witness_variables: Vec<ark_relations::r1cs::Variable> = Vec::new();
@@ -71,7 +87,9 @@ impl <F: Field> ConstraintSynthesizer<F> for CryptoCircuit<F> {
     }
     let sz = witness_variables.len();
     for i in 0..sz {
-        cs.enforce_constraint(lc!()+(F::one(), witness_variables[i]), lc!()+(F::one(), one), lc!()+(F::one(), input_variables[i]))?;
+        cs.enforce_constraint(lc!()+(F::one(), witness_variables[i]), 
+                              lc!()+(F::one(), one), lc!()+(F::one(), 
+                              input_variables[i]))?;
     }
     Ok(())
     }
@@ -79,7 +97,7 @@ impl <F: Field> ConstraintSynthesizer<F> for CryptoCircuit<F> {
 
 #[no_mangle]
 pub extern "C" fn generate_proof_zebralancer_rewarding(raw_data: *const c_char, public_key: *const c_char, 
-    encrypted_data: *const c_char) -> ProofAndVerifyKey {
+    private_key: *const c_char, encrypted_data: *const c_char) -> ProofAndVerifyKey {
         let field_bytes = 32; let data_size = 2048; let field_size = 256;
         let num_constraints = {
             let res = data_size / field_size;
@@ -89,12 +107,14 @@ pub extern "C" fn generate_proof_zebralancer_rewarding(raw_data: *const c_char, 
                 res+1
             }
         };
+        // TODO: Given aij formula of the number of constraints and variables
         let circuit = CryptoCircuit {
             encrypted_data: convert_c_hexstr_to_bytes(encrypted_data),
             raw_data: convert_c_hexstr_to_bytes(raw_data),
             public_key: convert_c_hexstr_to_bytes(public_key),
-            num_constraints: num_constraints,
-            num_variables: 2*num_constraints + 1,
+            private_key: convert_c_hexstr_to_bytes(private_key),
+            num_constraints: num_constraints+1,
+            num_variables: 2*(num_constraints + 1), // Mess number of constraints and variables here
             field_bytes: field_bytes,
             _phantom_field: PhantomData::<Fr>,
         };
