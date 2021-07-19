@@ -80,7 +80,7 @@ impl <F: Field> ConstraintSynthesizer<F> for CryptoCircuit<F> {
 #[no_mangle]
 pub extern "C" fn generate_proof_zebralancer_rewarding(raw_data: *const c_char, public_key: *const c_char, 
     encrypted_data: *const c_char) -> ProofAndVerifyKey {
-        let field_bytes = 32; let data_size = 4096; let field_size = 256;
+        let field_bytes = 32; let data_size = 2048; let field_size = 256;
         let num_constraints = {
             let res = data_size / field_size;
             if data_size % field_size == 0 {
