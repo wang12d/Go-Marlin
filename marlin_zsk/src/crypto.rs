@@ -1,5 +1,4 @@
 use crate::*;
-use std::marker::PhantomData;
 use rsa::{RSAPrivateKey, PublicKey, RSAPublicKey, PaddingScheme};
 use rand::RngCore;
 use rand_core::Error;
