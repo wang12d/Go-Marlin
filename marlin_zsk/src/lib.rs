@@ -36,6 +36,13 @@ pub struct ProofAndVerifyKey {
     pub verify_key: *const c_char,
 }
 
+#[derive(Clone, Copy)]
+#[repr(C)]
+pub struct DataEvaluationResults {
+    pub add: usize,
+    pub minus: usize,
+}
+
 const NUM_CONSTRAINTS: usize = 5;
 const NUM_VARIABLES: usize = 9;
 const ONE: usize = 1;

@@ -3,7 +3,7 @@
 mod crypto_test {
     use crate::crypto::{generate_proof_zebralancer_rewarding, verify_proof_zebralancer_rewarding,
         DummyRNG};
-    use crate::convert_c_hexstr_to_bytes;
+    use crate::{convert_c_hexstr_to_bytes, DataEvaluationResults};
     use std::{convert::TryFrom, ffi::{CStr, CString}};
     use libc::c_char;
     use rsa::{PublicKey, RSAPublicKey, RSAPrivateKey, PaddingScheme, PublicKeyEncoding, PrivateKeyEncoding};
@@ -64,11 +64,13 @@ SDBwSyWcJQiMNGKujV4cU2BPcikqpukmMh1pewDMy7cRggheClGkmZI=
     let mut u = vec![CString::new(hex::encode(enc_data)).unwrap()];
     let mut encoded_enc_data: Vec<_> = u.iter().map(|d| d.as_ptr()).collect();
     let size = 1;
-    let pv = generate_proof_zebralancer_rewarding(0, 25, 100, size,
+    let data_qualities = vec![100];
+    let pv = generate_proof_zebralancer_rewarding(0, 25, data_qualities.as_ptr(), size,
         encoded_public_key.as_ptr(), encoded_private_key.as_ptr(), 
         encoded_enc_data.as_ptr(), encoded_raw_data.as_ptr());
     // Get proof and vk
-    let vfy = verify_proof_zebralancer_rewarding(25, 175, size, encoded_enc_data.as_ptr(), pv.proof, pv.verify_key);
+    let eval = vec![DataEvaluationResults{add:175, minus:25,}];
+    let vfy = verify_proof_zebralancer_rewarding(eval.as_ptr(), size, encoded_enc_data.as_ptr(), pv.proof, pv.verify_key);
     assert_eq!(vfy, true);
 
     // Test false encryption data
@@ -80,10 +82,11 @@ SDBwSyWcJQiMNGKujV4cU2BPcikqpukmMh1pewDMy7cRggheClGkmZI=
     let mut v = Vec::new();
     v.push(CString::new(hex::encode(encoded_enc_data)).unwrap());
     let encoded_enc_data: Vec<_> = v.iter().map(|d| d.as_ptr()).collect();
-    let vfy = verify_proof_zebralancer_rewarding(25, 175, size, encoded_enc_data.as_ptr(), pv.proof, pv.verify_key);
+    let vfy = verify_proof_zebralancer_rewarding(eval.as_ptr(), size, encoded_enc_data.as_ptr(), pv.proof, pv.verify_key);
     assert_eq!(vfy, false);
     }
 
+    #[test]
     fn test_generate_proof_multiple_encryptions() {
 
     let mut rng = DummyRNG {};
@@ -142,11 +145,13 @@ SDBwSyWcJQiMNGKujV4cU2BPcikqpukmMh1pewDMy7cRggheClGkmZI=
     let encoded_raw_data: Vec<_> = v.iter().map(|d| d.as_ptr()).collect();
     let mut encoded_enc_data: Vec<_> = u.iter().map(|d| d.as_ptr()).collect();
     let size = 1;
-    let pv = generate_proof_zebralancer_rewarding(0, 25, 100, size,
+    let data_qualities = vec![100, 75];
+    let pv = generate_proof_zebralancer_rewarding(0, 25, data_qualities.as_ptr(), size,
         encoded_public_key.as_ptr(), encoded_private_key.as_ptr(), 
         encoded_enc_data.as_ptr(), encoded_raw_data.as_ptr());
     // Get proof and vk
-    let vfy = verify_proof_zebralancer_rewarding(25, 175, size, encoded_enc_data.as_ptr(), pv.proof, pv.verify_key);
+    let evals = vec![DataEvaluationResults{add:175, minus:25,}, DataEvaluationResults{add: 150, minus: 0}];
+    let vfy = verify_proof_zebralancer_rewarding(evals.as_ptr(), size, encoded_enc_data.as_ptr(), pv.proof, pv.verify_key);
     assert_eq!(vfy, true);
 
     // Test false encryption data
@@ -164,7 +169,7 @@ SDBwSyWcJQiMNGKujV4cU2BPcikqpukmMh1pewDMy7cRggheClGkmZI=
     };
     v.push(CString::new(hex::encode(encoded_enc_data_two)).unwrap());
     let encoded_enc_data: Vec<_> = v.iter().map(|d| d.as_ptr()).collect();
-    let vfy = verify_proof_zebralancer_rewarding(25, 175, size, encoded_enc_data.as_ptr(), pv.proof, pv.verify_key);
+    let vfy = verify_proof_zebralancer_rewarding(evals.as_ptr(), size, encoded_enc_data.as_ptr(), pv.proof, pv.verify_key);
     assert_eq!(vfy, false);
     }
 }

@@ -33,7 +33,7 @@ struct CryptoCircuit<F: Field> {
     raw_data: Vec<Vec<u8>>,       // The bytes of raw data
     public_key: Vec<u8>,     // The bytes of rsa public key, with key size 2048 bits
     private_key: Vec<u8>,   // The bytes of rsa private key
-    data_quality: Option<F>,
+    data_qualities: Vec<usize>,
     sigma: Option<F>,
     mu: Option<F>,
     num_constraints: usize,
@@ -103,15 +103,8 @@ impl <F: Field> ConstraintSynthesizer<F> for CryptoCircuit<F> {
     /*************************************************************
     ********The Marlin ZSK Proof Constraint of data quality*******
     *************************************************************/
-    let data_quality = cs.new_witness_variable(|| self.data_quality.ok_or(SynthesisError::AssignmentMissing))?;
     let mu = cs.new_witness_variable(|| self.mu.ok_or(SynthesisError::AssignmentMissing))?;
     let sigma = cs.new_witness_variable(|| self.sigma.ok_or(SynthesisError::AssignmentMissing))?;
-    let w1 = cs.new_witness_variable(|| {
-        let mut data_quality = self.data_quality.ok_or(SynthesisError::AssignmentMissing)?;
-        let mu = self.mu.ok_or(SynthesisError::AssignmentMissing)?;
-        data_quality.sub_assign(&mu);
-        Ok(data_quality)
-    })?;
     let w2 = cs.new_witness_variable(|| {
         let mut sigma = self.sigma.ok_or(SynthesisError::AssignmentMissing)?;
         let three = F::one() + F::one() + F::one();
@@ -131,46 +124,56 @@ impl <F: Field> ConstraintSynthesizer<F> for CryptoCircuit<F> {
 
     })?;
 
+    for data in self.data_qualities.iter() {
+        let data = F::from(*data as u128);
+        let w1 = cs.new_witness_variable(|| {
+            let mut data_quality = data;
+            let mu = self.mu.ok_or(SynthesisError::AssignmentMissing)?;
+            data_quality.sub_assign(&mu);
+            Ok(data_quality)
+        })?;
+        let data_quality = cs.new_witness_variable(|| Ok(data))?;
+        let out_minus = cs.new_input_variable(|| {
+            let mut data_quality = data;
+            let mu = self.mu.ok_or(SynthesisError::AssignmentMissing)?;
+            data_quality.sub_assign(&mu);
+            let mut sigma = self.sigma.ok_or(SynthesisError::AssignmentMissing)?;
+            let three = F::one() + F::one() + F::one();
+            sigma.mul_assign(&three);
 
-    let out_minus = cs.new_input_variable(|| {
-        let mut data_quality = self.data_quality.ok_or(SynthesisError::AssignmentMissing)?;
-        let mu = self.mu.ok_or(SynthesisError::AssignmentMissing)?;
-        data_quality.sub_assign(&mu);
-        let mut sigma = self.sigma.ok_or(SynthesisError::AssignmentMissing)?;
-        let three = F::one() + F::one() + F::one();
-        sigma.mul_assign(&three);
+            data_quality -= &sigma;
 
-        data_quality -= &sigma;
+            Ok(data_quality)
+        })?;
+            
+        let out_add = cs.new_input_variable(|| {
+            let mut data_quality = data;
+            let mu = self.mu.ok_or(SynthesisError::AssignmentMissing)?;
+            data_quality.sub_assign(&mu);
+            let mut sigma = self.sigma.ok_or(SynthesisError::AssignmentMissing)?;
+            let three = F::one() + F::one() + F::one();
+            sigma.mul_assign(&three);
 
-        Ok(data_quality)
-    })?;
-        
-    let out_add = cs.new_input_variable(|| {
-        let mut data_quality = self.data_quality.ok_or(SynthesisError::AssignmentMissing)?;
-        let mu = self.mu.ok_or(SynthesisError::AssignmentMissing)?;
-        data_quality.sub_assign(&mu);
-        let mut sigma = self.sigma.ok_or(SynthesisError::AssignmentMissing)?;
-        let three = F::one() + F::one() + F::one();
-        sigma.mul_assign(&three);
+            data_quality += &sigma;
 
-        data_quality += &sigma;
+            Ok(data_quality)
+        })?;
 
-        Ok(data_quality)
-    })?;
+        cs.enforce_constraint(lc!() + (F::one(), mu) + (F::one(), w1), lc!() + (F::one(), one), lc!() + (F::one(), data_quality))?;
+        cs.enforce_constraint(lc!() + (F::one(), w2) + (F::one(), out_minus), lc!() + (F::one(), one), lc!() + (F::one(), w1))?;
+        cs.enforce_constraint(lc!() + (F::one(), w1) + (F::one(), w2), lc!() + (F::one(), one), lc!() + (F::one(), out_add))?;
+        cs.enforce_constraint(lc!() + (F::one(), w3) + (F::one(), out_minus), lc!() + (F::one(), one), lc!() + (F::one(), out_add))?;
+    }
 
     let three = F::one() + F::one() + F::one();
-    cs.enforce_constraint(lc!() + (F::one(), mu) + (F::one(), w1), lc!() + (F::one(), one), lc!() + (F::one(), data_quality))?;
     cs.enforce_constraint(lc!() + (three, one), lc!() + (F::one(), sigma), lc!() + (F::one(), w2))?;
-    cs.enforce_constraint(lc!() + (F::one(), w2) + (F::one(), out_minus), lc!() + (F::one(), one), lc!() + (F::one(), w1))?;
-    cs.enforce_constraint(lc!() + (F::one(), w1) + (F::one(), w2), lc!() + (F::one(), one), lc!() + (F::one(), out_add))?;
-    cs.enforce_constraint(lc!() + (F::one(), w3) + (F::one(), out_minus), lc!() + (F::one(), one), lc!() + (F::one(), out_add))?;
     Ok(())
     }
 }
 
 #[no_mangle]
 pub extern "C" fn generate_proof_zebralancer_rewarding(
-    mu: usize, sigma: usize, data: usize, size: usize, public_key: *const c_char, private_key: *const c_char, 
+    mu: usize, sigma: usize, data_qualities: *const usize, size: usize, public_key: *const c_char, private_key: *const c_char, 
             encrypted_data: *const *const c_char, raw_data: *const *const c_char) -> ProofAndVerifyKey {
         let field_bytes = 32; let data_size = 2048; let field_size = 256;
         let num_constraints = { // The number of constraints for encrypted data equality
@@ -181,24 +184,29 @@ pub extern "C" fn generate_proof_zebralancer_rewarding(
                 res+1
             }
         };
-        // TODO: Given aij formula of the number of constraints and variables
+        // TODO: Given a formula of the number of constraints and variables
         let mut vec_encrypted_data = Vec::new();
         let mut vec_raw_data = Vec::new();
+        let mut vec_data = Vec::new();
         for i in 0..size {
             let data = unsafe {*raw_data.offset(i as isize)};
             let enc = unsafe {*encrypted_data.offset(i as isize)};
+            let data_quality = unsafe {*data_qualities.offset(i as isize)};
             vec_encrypted_data.push(convert_c_hexstr_to_bytes(enc));
             vec_raw_data.push(convert_c_hexstr_to_bytes(data));
+            vec_data.push(data_quality);
         }
         let circuit = CryptoCircuit {
             encrypted_data: vec_encrypted_data,
             raw_data: vec_raw_data,
             public_key: convert_c_hexstr_to_bytes(public_key),
             private_key: convert_c_hexstr_to_bytes(private_key),
-            num_constraints: size*num_constraints + 1 + 5, // 1 for key_pair, 5 for quality
-            num_variables: 2*size*num_constraints + 2 + 8, // Mess number of constraints and variables here
+            // encrypted data constraints, key pair constraints, qualities constraints and constant constraints
+            num_constraints: size*num_constraints + 1 + 4*size + 1, 
+            // number of encrypted data varibies, key pair, qualities variables and constant
+            num_variables: 2*size*num_constraints + 2 + 4*size + 4,
             field_bytes: field_bytes,
-            data_quality: Some(Fr::from(data as u128)),
+            data_qualities: vec_data,
             mu: Some(Fr::from(mu as u128)),
             sigma: Some(Fr::from(sigma as u128)),
         };
@@ -222,7 +230,7 @@ pub extern "C" fn generate_proof_zebralancer_rewarding(
 
 #[no_mangle]
 pub extern "C" fn verify_proof_zebralancer_rewarding(
-    quality_one: usize, quality_two: usize, size: usize, ciphertext: *const *const c_char,
+    evaluations: *const DataEvaluationResults, size: usize, ciphertext: *const *const c_char,
     proof: *const c_char, vk: *const c_char) -> bool {
     let rng = &mut ark_std::test_rng();
     let proof = {
@@ -256,7 +264,10 @@ pub extern "C" fn verify_proof_zebralancer_rewarding(
             index = last;
         }
     }
-    inputs.push(Fr::from(quality_one as u128));
-    inputs.push(Fr::from(quality_two as u128));
+    for i in 0..size {
+        let eval = unsafe {*evaluations.offset(i as isize)};
+        inputs.push(Fr::from(eval.minus as u128));
+        inputs.push(Fr::from(eval.add as u128));
+    }
     MarlinInst::verify(&vk, &inputs[..], &proof, rng).unwrap()
 }
