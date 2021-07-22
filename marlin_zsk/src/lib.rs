@@ -26,6 +26,10 @@ mod test;
 
 mod zebralancer;
 
+mod crypto;
+
+mod crypto_test;
+
 #[repr(C)]
 pub struct ProofAndVerifyKey {
     pub proof: *const c_char,
@@ -116,9 +120,18 @@ impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for DataQualityCircu
     }
 }
 
-fn convert_c_hexstr_to_bytes(encoded_c_str: *const c_char) -> Vec<u8> {
+pub fn convert_c_hexstr_to_bytes(encoded_c_str: *const c_char) -> Vec<u8> {
     let encode_str = unsafe {CStr::from_ptr(encoded_c_str)};
     decode(encode_str.to_str().unwrap()).unwrap()
+}
+
+// Convert bytes encoded big integer 256 to ark-workers BigInteger256,
+// then converts encoded the BigInteger256 to bytes
+pub fn field_encode_convert(raw_vec: &[u8]) -> Vec<u8> {
+    let fr_element = Fr::new(BigInteger256::read(raw_vec).unwrap());
+    let mut field_encode = Vec::new();
+    fr_element.serialize(&mut field_encode).unwrap();
+    return field_encode;
 }
 
 #[no_mangle]

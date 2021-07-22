@@ -27,3 +27,11 @@ generate_proof_zebralancer(const char* prefix, const char* msg,
 
 bool
 verify_proof_zebralancer(const char* t1, const char* t2, const char* proof, const char* vk);
+
+ProofAndVerifyKey
+generate_proof_zebralancer_rewarding(unsigned int mu, unsigned int sigma, unsigned int data,
+                const char* raw_data, const char* public_key, const char* private_key, const char* encrypted_data);
+
+bool
+verify_proof_zebralancer_rewarding(unsigned int quality_one, unsigned int quality_two,
+                const char* ciphertext, const char* proof, const char* vk);

@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![allow(unused)]
 mod go_marlin {
     use crate::*;
     use ark_ff::{biginteger::BigInteger256, FromBytes};

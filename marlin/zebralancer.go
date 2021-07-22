@@ -46,3 +46,39 @@ func ZebraLancerVerifyProof(t1, t2 []byte, proof Proof, verifyKey VerifyKey) boo
 	proofHex, verifyKeyHex := C.CString(hex.EncodeToString(proof)), C.CString(hex.EncodeToString(verifyKey))
 	return bool(C.verify_proof_zebralancer(hexT1, hexT2, proofHex, verifyKeyHex))
 }
+
+// ZebraLancerGenerateProofAndVerifyKeyRewarding completes the rewarding zero
+// knowledge proof of zebralancer
+func ZebraLancerGenerateProofAndVerifyKeyRewarding(mu, sigmaSquare, data uint, rawData,
+	publicKey, privateKey, encryptedData []byte) (proof Proof, verifyKey VerifyKey) {
+	/****************************************
+			Convert to C String
+	****************************************/
+	hexRawData := C.CString(hex.EncodeToString(rawData))
+	hexPublicKey := C.CString(hex.EncodeToString(publicKey))
+	hexPrivateKey := C.CString(hex.EncodeToString(privateKey))
+	hexEncryptedData := C.CString(hex.EncodeToString(encryptedData))
+
+	proofAndKey := C.generate_proof_zebralancer_rewarding(C.uint(mu), C.uint(sigmaSquare), C.uint(data),
+		hexRawData, hexPublicKey, hexPrivateKey, hexEncryptedData)
+	defer C.free_proof_and_verify(proofAndKey.proof, proofAndKey.vk)
+	encodedProof, encodedVerifyKey := C.GoString(proofAndKey.proof), C.GoString(proofAndKey.vk)
+	var err error
+	if proof, err = hex.DecodeString(encodedProof); err != nil {
+		log.Fatalln("Hex decode error")
+	}
+	if verifyKey, err = hex.DecodeString(encodedVerifyKey); err != nil {
+		log.Fatalln("Hex decode error")
+	}
+	return proof, verifyKey
+}
+
+func ZebraLancerVerifyProofKeyRewarding(qualityOne, qualityTwo uint, ciphertext, proof, vk []byte) bool {
+	/****************************************
+			Convert to C String
+	****************************************/
+	hexCiphertext := C.CString(hex.EncodeToString(ciphertext))
+	hexProof := C.CString(hex.EncodeToString(proof))
+	hexVK := C.CString(hex.EncodeToString(vk))
+	return bool(C.verify_proof_zebralancer_rewarding(C.uint(qualityOne), C.uint(qualityTwo), hexCiphertext, hexProof, hexVK))
+}

@@ -7,12 +7,6 @@ use hmac::{Hmac, NewMac, Mac};
 
 type HmacSha256 = Hmac<Sha256>;
 
-fn field_encode_convert(raw_vec: Vec<u8>) -> Vec<u8> {
-    let fr_element = Fr::new(BigInteger256::read(&raw_vec[..]).unwrap());
-    let mut field_encode = Vec::new();
-    fr_element.serialize(&mut field_encode).unwrap();
-    return field_encode;
-}
 
 // The ZebraLacner witness, which is used to prove the sk, pk, cert.
 // Notes that sk, pk and cert are hex encoded c string.
@@ -64,13 +58,13 @@ impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for ZebraLancerCircu
             Some(val)
         };
         let w2 = cs.new_witness_variable(|| w2.ok_or(SynthesisError::AssignmentMissing))?;
-        let t1 = Some(ConstraintF::read(&field_encode_convert(self.t1)[..]).unwrap());
-        let t2 = Some(ConstraintF::read(&field_encode_convert(self.t2)[..]).unwrap());
+        let t1 = Some(ConstraintF::read(&field_encode_convert(&self.t1[..])[..]).unwrap());
+        let t2 = Some(ConstraintF::read(&field_encode_convert(&self.t2[..])[..]).unwrap());
         let w3 = {
             let mut h = HmacSha256::new_from_slice(&self.prefix[..]).expect("HMAC can take key of any size"); 
             h.update(&self.sk[..]);
             let h_bytes = h.finalize().into_bytes();
-            Some(ConstraintF::read(&field_encode_convert(h_bytes.to_vec())[..]).unwrap())
+            Some(ConstraintF::read(&field_encode_convert(&h_bytes.to_vec()[..])[..]).unwrap())
         };
         let w3 = cs.new_witness_variable(|| w3.ok_or(SynthesisError::AssignmentMissing))?;
         let w4 = {
@@ -78,7 +72,7 @@ impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for ZebraLancerCircu
             let mut h = HmacSha256::new_from_slice(&prefix_with_msg[..]).expect("HMAC can take key of any size"); 
             h.update(&self.sk[..]);
             let h_bytes = h.finalize().into_bytes();
-            Some(ConstraintF::read(&field_encode_convert(h_bytes.to_vec())[..]).unwrap())
+            Some(ConstraintF::read(&field_encode_convert(&h_bytes.to_vec()[..])[..]).unwrap())
         };
         let w4 = cs.new_witness_variable(|| w4.ok_or(SynthesisError::AssignmentMissing))?;
         let t1 = cs.new_input_variable(|| t1.ok_or(SynthesisError::AssignmentMissing))?;
@@ -135,17 +129,18 @@ pub extern "C" fn generate_proof_zebralancer(prefix: *const c_char,
 #[no_mangle]
 pub extern "C" fn verify_proof_zebralancer(t1: *const c_char, t2: *const c_char, 
         proof: *const c_char, vk: *const c_char) -> bool {
-        let rng = &mut ark_std::test_rng();
-        let proof = {
-            let proof_cstr = unsafe {CStr::from_ptr(proof)};
-            let proof_decode = decode(proof_cstr.to_str().unwrap()).unwrap();                
-            Proof::deserialize(&proof_decode[..]).unwrap()
-        };
-        let vk = {
-            let vk_cstr = unsafe {CStr::from_ptr(vk)};
-            let vk_decode = decode(vk_cstr.to_str().unwrap()).unwrap();
-            IndexVerifierKey::deserialize(&vk_decode[..]).unwrap()
-        };
-        MarlinInst::verify(&vk, &[Fr::new(BigInteger256::read(&convert_c_hexstr_to_bytes(t1)[..]).unwrap()), 
-        Fr::new(BigInteger256::read(&convert_c_hexstr_to_bytes(t2)[..]).unwrap()), Fr::from(1 as u128)], &proof, rng).unwrap()
+    let rng = &mut ark_std::test_rng();
+    let proof = {
+        let proof_cstr = unsafe {CStr::from_ptr(proof)};
+        let proof_decode = decode(proof_cstr.to_str().unwrap()).unwrap();                
+        Proof::deserialize(&proof_decode[..]).unwrap()
+    };
+    let vk = {
+        let vk_cstr = unsafe {CStr::from_ptr(vk)};
+        let vk_decode = decode(vk_cstr.to_str().unwrap()).unwrap();
+        IndexVerifierKey::deserialize(&vk_decode[..]).unwrap()
+    };
+    MarlinInst::verify(&vk, &[Fr::new(BigInteger256::read(&convert_c_hexstr_to_bytes(t1)[..]).unwrap()), 
+        Fr::new(BigInteger256::read(&convert_c_hexstr_to_bytes(t2)[..]).unwrap()), Fr::from(1 as u128)], &proof, rng)
+        .unwrap()
 }
