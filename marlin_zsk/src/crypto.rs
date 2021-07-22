@@ -29,10 +29,10 @@ impl RngCore for DummyRNG {
 
 #[derive(Clone)]
 struct CryptoCircuit<F: Field> {
-    encrypted_data: Vec<u8>,  // The bytes of encrypted data
+    encrypted_data: Vec<Vec<u8>>,  // The bytes of encrypted data
+    raw_data: Vec<Vec<u8>>,       // The bytes of raw data
     public_key: Vec<u8>,     // The bytes of rsa public key, with key size 2048 bits
     private_key: Vec<u8>,   // The bytes of rsa private key
-    raw_data: Vec<u8>,       // The bytes of raw data
     data_quality: Option<F>,
     sigma: Option<F>,
     mu: Option<F>,
@@ -71,32 +71,34 @@ impl <F: Field> ConstraintSynthesizer<F> for CryptoCircuit<F> {
     /*************************************************************
     ********The Marlin ZSK Proof Constraint of encryption*********
     *************************************************************/
-    let padding = PaddingScheme::new_oaep::<sha2::Sha512>();
-    // RSA OAEP decryption
-    let encrypted_data = public_key.encrypt(&mut rng, padding, &self.raw_data).expect("failed to decrypt");
-    // Now comparing the decrypted data with raw data
-    let length = encrypted_data.len();
-    let mut index = 0; 
     // The encoding of encrypted bytes, converts them to a field element
     // and compare the equality of each number
-    let mut witness_variables: Vec<ark_relations::r1cs::Variable> = Vec::new();
-    let mut input_variables: Vec<ark_relations::r1cs::Variable> = Vec::new();
-    while index < length {
-        let mut last = index + self.field_bytes; 
-        if last > length {
-            last = length;
+    for (data, encrypted_input) in self.raw_data.iter().zip(self.encrypted_data.iter()) {
+        let padding = PaddingScheme::new_oaep::<sha2::Sha512>();
+        // RSA OAEP decryption
+        let encrypted_data = public_key.encrypt(&mut rng, padding, &data).expect("failed to decrypt");
+        // Now comparing the decrypted data with raw data
+        let length = encrypted_data.len();
+        let mut index = 0; 
+        let mut witness_variables: Vec<ark_relations::r1cs::Variable> = Vec::new();
+        let mut input_variables: Vec<ark_relations::r1cs::Variable> = Vec::new();
+        while index < length {
+            let mut last = index + self.field_bytes; 
+            if last > length {
+                last = length;
+            }
+            let encrypted_field = F::read(&field_encode_convert(&encrypted_data[index..last])[..]).expect("failed to read encrypted raw data to field number");
+            let self_encrypted_field = F::read(&field_encode_convert(&encrypted_input[index..last])[..]).expect("failed read raw data to field number");
+            index = last ;
+            witness_variables.push(cs.new_witness_variable(|| Ok(encrypted_field)).unwrap());
+            input_variables.push(cs.new_input_variable(|| Ok(self_encrypted_field)).unwrap());
         }
-        let encrypted_field = F::read(&field_encode_convert(&encrypted_data[index..last])[..]).expect("failed to read encrypted raw data to field number");
-        let self_encrypted_field = F::read(&field_encode_convert(&self.encrypted_data[index..last])[..]).expect("failed read raw data to field number");
-        index = last ;
-        witness_variables.push(cs.new_witness_variable(|| Ok(encrypted_field)).unwrap());
-        input_variables.push(cs.new_input_variable(|| Ok(self_encrypted_field)).unwrap());
-    }
-    let sz = witness_variables.len();
-    for i in 0..sz {
-        cs.enforce_constraint(lc!()+(F::one(), witness_variables[i]), 
-                              lc!()+(F::one(), one), lc!()+(F::one(), 
-                              input_variables[i]))?;
+        let sz = witness_variables.len();
+        for i in 0..sz {
+            cs.enforce_constraint(lc!()+(F::one(), witness_variables[i]), 
+                                  lc!()+(F::one(), one), lc!()+(F::one(), 
+                                  input_variables[i]))?;
+        }
     }
     /*************************************************************
     ********The Marlin ZSK Proof Constraint of data quality*******
@@ -168,10 +170,10 @@ impl <F: Field> ConstraintSynthesizer<F> for CryptoCircuit<F> {
 
 #[no_mangle]
 pub extern "C" fn generate_proof_zebralancer_rewarding(
-    mu: usize, sigma: usize, data: usize, raw_data: *const c_char, 
-    public_key: *const c_char, private_key: *const c_char, encrypted_data: *const c_char) -> ProofAndVerifyKey {
+    mu: usize, sigma: usize, data: usize, size: usize, public_key: *const c_char, private_key: *const c_char, 
+            encrypted_data: *const *const c_char, raw_data: *const *const c_char) -> ProofAndVerifyKey {
         let field_bytes = 32; let data_size = 2048; let field_size = 256;
-        let num_constraints = {
+        let num_constraints = { // The number of constraints for encrypted data equality
             let res = data_size / field_size;
             if data_size % field_size == 0 {
                 res
@@ -180,13 +182,21 @@ pub extern "C" fn generate_proof_zebralancer_rewarding(
             }
         };
         // TODO: Given aij formula of the number of constraints and variables
+        let mut vec_encrypted_data = Vec::new();
+        let mut vec_raw_data = Vec::new();
+        for i in 0..size {
+            let data = unsafe {*raw_data.offset(i as isize)};
+            let enc = unsafe {*encrypted_data.offset(i as isize)};
+            vec_encrypted_data.push(convert_c_hexstr_to_bytes(enc));
+            vec_raw_data.push(convert_c_hexstr_to_bytes(data));
+        }
         let circuit = CryptoCircuit {
-            encrypted_data: convert_c_hexstr_to_bytes(encrypted_data),
-            raw_data: convert_c_hexstr_to_bytes(raw_data),
+            encrypted_data: vec_encrypted_data,
+            raw_data: vec_raw_data,
             public_key: convert_c_hexstr_to_bytes(public_key),
             private_key: convert_c_hexstr_to_bytes(private_key),
-            num_constraints: num_constraints+1+5, // 1 for key_pair, 5 for quality
-            num_variables: 2*(num_constraints + 1) + 8, // Mess number of constraints and variables here
+            num_constraints: size*num_constraints + 1 + 5, // 1 for key_pair, 5 for quality
+            num_variables: 2*size*num_constraints + 2 + 8, // Mess number of constraints and variables here
             field_bytes: field_bytes,
             data_quality: Some(Fr::from(data as u128)),
             mu: Some(Fr::from(mu as u128)),
@@ -212,7 +222,7 @@ pub extern "C" fn generate_proof_zebralancer_rewarding(
 
 #[no_mangle]
 pub extern "C" fn verify_proof_zebralancer_rewarding(
-    quality_one: usize, quality_two: usize, ciphertext: *const c_char, 
+    quality_one: usize, quality_two: usize, size: usize, ciphertext: *const *const c_char,
     proof: *const c_char, vk: *const c_char) -> bool {
     let rng = &mut ark_std::test_rng();
     let proof = {
@@ -225,20 +235,26 @@ pub extern "C" fn verify_proof_zebralancer_rewarding(
         let vk_decode = decode(vk_cstr.to_str().unwrap()).unwrap();
         IndexVerifierKey::deserialize(&vk_decode[..]).unwrap()
     };
-    let encrypted_data = {
-        let ciphertext = unsafe {CStr::from_ptr(ciphertext)};
-        hex::decode(ciphertext.to_str().unwrap()).unwrap()
-    };
-    let mut index = 0; let length = encrypted_data.len();
-    let mut inputs = Vec::new();
-    while index < length {
-        let mut last = index + 32; 
-        if last > length {
-            last = length;
+    let encrypted_data: Vec<_> = {
+        let mut v = Vec::new();
+        for i in 0..size {
+            let ctext = unsafe {CStr::from_ptr(*ciphertext.offset(i as isize))};
+            v.push(hex::decode(ctext.to_str().unwrap()).unwrap());
         }
-        let encrypted_field = Fr::read(&field_encode_convert(&encrypted_data[index..last])[..]).expect("failed to read encrypted raw data to field number"); 
-        inputs.push(encrypted_field);
-        index = last;
+        v
+    };
+    let mut inputs = Vec::new();
+    for enc in encrypted_data.iter() {
+        let mut index = 0; let length = enc.len();
+        while index < length {
+            let mut last = index + 32; 
+            if last > length {
+                last = length;
+            }
+            let encrypted_field = Fr::read(&field_encode_convert(&enc[index..last])[..]).expect("failed to read encrypted raw data to field number"); 
+            inputs.push(encrypted_field);
+            index = last;
+        }
     }
     inputs.push(Fr::from(quality_one as u128));
     inputs.push(Fr::from(quality_two as u128));
