@@ -170,7 +170,7 @@ pub extern "C" fn generate_proof_echain(mu: u32, sigma: u32, data: u32) -> Proof
 }
 
 #[no_mangle]
-pub extern "C" fn verify_proof_echain(out_one: u32, out_two: u32, proof: *const c_char, vk: *const c_char) -> bool {
+pub extern "C" fn verify_proof_echain(eval: DataEvaluationResults, proof: *const c_char, vk: *const c_char) -> bool {
     let rng = &mut ark_std::test_rng();
     let proof_cstr = unsafe {CStr::from_ptr(proof)};
     let proof_decode = decode(proof_cstr.to_str().unwrap()).unwrap();
@@ -178,7 +178,7 @@ pub extern "C" fn verify_proof_echain(out_one: u32, out_two: u32, proof: *const 
     let vk_cstr = unsafe {CStr::from_ptr(vk)};
     let vk_decode = decode(vk_cstr.to_str().unwrap()).unwrap();
     let vk = IndexVerifierKey::deserialize(&vk_decode[..]).unwrap();
-    MarlinInst::verify(&vk, &[Fr::from(ONE as u128), Fr::from(out_one as u128), Fr::from(out_two as u128)], 
+    MarlinInst::verify(&vk, &[Fr::from(ONE as u128), Fr::from(eval.minus as u128), Fr::from(eval.add as u128)], 
         &proof, rng).unwrap()
 }
 

@@ -192,6 +192,7 @@ pub extern "C" fn generate_proof_zebralancer_rewarding(
             let data = unsafe {*raw_data.offset(i as isize)};
             let enc = unsafe {*encrypted_data.offset(i as isize)};
             let data_quality = unsafe {*data_qualities.offset(i as isize)};
+            println!("In Rust: {}", unsafe {CStr::from_ptr(data).to_str().unwrap()});
             vec_encrypted_data.push(convert_c_hexstr_to_bytes(enc));
             vec_raw_data.push(convert_c_hexstr_to_bytes(data));
             vec_data.push(data_quality);

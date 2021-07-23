@@ -4,6 +4,9 @@ package marlin
 // #include <stdbool.h>
 // #include <stdlib.h>
 // #include "./../lib/marlin_zsk.h"
+// DataEvaluationResult newDataEvaluationResult(unsigned int add, unsigned int minus) {
+//		return (DataEvaluationResult) {add, minus};
+// }
 import "C"
 import (
 	"encoding/hex"
@@ -49,18 +52,24 @@ func ZebraLancerVerifyProof(t1, t2 []byte, proof Proof, verifyKey VerifyKey) boo
 
 // ZebraLancerGenerateProofAndVerifyKeyRewarding completes the rewarding zero
 // knowledge proof of zebralancer
-func ZebraLancerGenerateProofAndVerifyKeyRewarding(mu, sigmaSquare, data uint, rawData,
-	publicKey, privateKey, encryptedData []byte) (proof Proof, verifyKey VerifyKey) {
+func ZebraLancerGenerateProofAndVerifyKeyRewarding(mu, sigmaSquare uint, data []uint,
+	publicKey, privateKey []byte, encryptedData, rawData [][]byte) (proof Proof, verifyKey VerifyKey) {
 	/****************************************
 			Convert to C String
 	****************************************/
-	hexRawData := C.CString(hex.EncodeToString(rawData))
+	size := len(rawData)
+	hexRawData, hexEncryptedData := make([]*C.char, size), make([]*C.char, size)
 	hexPublicKey := C.CString(hex.EncodeToString(publicKey))
 	hexPrivateKey := C.CString(hex.EncodeToString(privateKey))
-	hexEncryptedData := C.CString(hex.EncodeToString(encryptedData))
+	uData := make([]C.uint, size)
+	for i := 0; i < size; i++ {
+		hexRawData[i] = C.CString(hex.EncodeToString(rawData[i]))
+		hexEncryptedData[i] = C.CString(hex.EncodeToString(encryptedData[i]))
+		uData[i] = C.uint(data[i])
+	}
 
-	proofAndKey := C.generate_proof_zebralancer_rewarding(C.uint(mu), C.uint(sigmaSquare), C.uint(data),
-		hexRawData, hexPublicKey, hexPrivateKey, hexEncryptedData)
+	proofAndKey := C.generate_proof_zebralancer_rewarding(C.uint(mu), C.uint(sigmaSquare), &uData[0], C.uint(size),
+		hexPublicKey, hexPrivateKey, &hexEncryptedData[0], &hexRawData[0])
 	defer C.free_proof_and_verify(proofAndKey.proof, proofAndKey.vk)
 	encodedProof, encodedVerifyKey := C.GoString(proofAndKey.proof), C.GoString(proofAndKey.vk)
 	var err error
@@ -73,12 +82,18 @@ func ZebraLancerGenerateProofAndVerifyKeyRewarding(mu, sigmaSquare, data uint, r
 	return proof, verifyKey
 }
 
-func ZebraLancerVerifyProofKeyRewarding(qualityOne, qualityTwo uint, ciphertext, proof, vk []byte) bool {
+func ZebraLancerVerifyProofKeyRewarding(evals []EvaluationResults, ciphertext [][]byte, proof, vk []byte) bool {
 	/****************************************
 			Convert to C String
 	****************************************/
-	hexCiphertext := C.CString(hex.EncodeToString(ciphertext))
+	size := len(ciphertext)
+	dataEvals := make([]C.DataEvaluationResult, size)
+	hexCiphertext := make([]*C.char, size)
+	for i := 0; i < size; i++ {
+		dataEvals[i] = C.newDataEvaluationResult(C.uint(evals[i][0]), C.uint(evals[i][1]))
+		hexCiphertext[i] = C.CString(hex.EncodeToString(ciphertext[i]))
+	}
 	hexProof := C.CString(hex.EncodeToString(proof))
 	hexVK := C.CString(hex.EncodeToString(vk))
-	return bool(C.verify_proof_zebralancer_rewarding(C.uint(qualityOne), C.uint(qualityTwo), hexCiphertext, hexProof, hexVK))
+	return bool(C.verify_proof_zebralancer_rewarding(&dataEvals[0], C.uint(size), &hexCiphertext[0], hexProof, hexVK))
 }

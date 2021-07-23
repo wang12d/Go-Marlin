@@ -52,7 +52,7 @@ func main() {
 	/************************************************************
 	        Zebralacner Rewarding Verification
 	************************************************************/
-	data := []byte("hello")
+	data := [][]byte{[]byte("hello")}
 	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
 	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
 	privateKeyPem := pem.EncodeToMemory(
@@ -70,8 +70,8 @@ func main() {
 		},
 	)
 
-	encryptedData, _ := rsa.EncryptOAEP(sha512.New(), &DummyReader{}, &privateKey.PublicKey, data, nil)
-	proof, vk = marlin.ZebraLancerGenerateProofAndVerifyKeyRewarding(0, 25, 100, data, publicKeyPem, privateKeyPem, encryptedData)
+	encryptedData, _ := rsa.EncryptOAEP(sha512.New(), &DummyReader{}, &privateKey.PublicKey, data[0], nil)
+	proof, vk = marlin.ZebraLancerGenerateProofAndVerifyKeyRewarding(0, 25, []uint{100}, publicKeyPem, privateKeyPem, [][]byte{encryptedData}, data)
 
-	fmt.Printf("Rewarding verify result: %v\n", marlin.ZebraLancerVerifyProofKeyRewarding(25, 175, encryptedData, proof, vk))
+	fmt.Printf("Rewarding verify result: %v\n", marlin.ZebraLancerVerifyProofKeyRewarding([]marlin.EvaluationResults{{25, 175}}, [][]byte{encryptedData}, proof, vk))
 }
