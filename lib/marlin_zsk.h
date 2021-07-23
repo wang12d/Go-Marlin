@@ -1,15 +1,20 @@
 #include <stdbool.h>
 
-typedef struct ProofAndVerifyKey {
+typedef struct {
     const char* proof;
     const char* vk;
 } ProofAndVerifyKey;
 
-typedef struct ZebraLancerWitness {
+typedef struct {
     const char* sk;
     const char* pk;
     const char* cert;
 } ZebraLancerWitness;
+
+typedef struct {
+    unsigned int add;
+    unsigned int minus;
+} DataEvaluationResult;
 
 ProofAndVerifyKey
 generate_proof_echain(unsigned int mu, unsigned int sigma, unsigned int data);
@@ -29,9 +34,9 @@ bool
 verify_proof_zebralancer(const char* t1, const char* t2, const char* proof, const char* vk);
 
 ProofAndVerifyKey
-generate_proof_zebralancer_rewarding(unsigned int mu, unsigned int sigma, unsigned int data,
-                const char* raw_data, const char* public_key, const char* private_key, const char* encrypted_data);
+generate_proof_zebralancer_rewarding(unsigned int mu, unsigned int sigma, unsigned int* data, unsigned int size,
+                const char* public_key, const char* private_key, const char** encrypted_data, const char** raw_data);
 
 bool
-verify_proof_zebralancer_rewarding(unsigned int quality_one, unsigned int quality_two,
-                const char* ciphertext, const char* proof, const char* vk);
+verify_proof_zebralancer_rewarding(DataEvaluationResult* eval, unsigned int size,
+    const char** ciphertext, const char* proof, const char* vk);
