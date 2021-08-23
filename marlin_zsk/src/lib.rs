@@ -1,11 +1,12 @@
 use std::ffi::{CString, CStr};
 use libc::c_char;
 use ark_bls12_381::{Bls12_381, Fr};
-use ark_marlin::{Marlin, Proof, IndexVerifierKey};
+use ark_marlin::{Marlin, Proof, IndexVerifierKey, IndexProverKey, UniversalSRS, Error};
 use ark_poly::univariate::DensePolynomial;
+use ark_std::rand::RngCore;
 use ark_serialize::*;
-use ark_poly_commit::marlin_pc::MarlinKZG10;
-use ark_ff::{biginteger::BigInteger256, Field, FromBytes};
+use ark_poly_commit::{marlin_pc::MarlinKZG10, PolynomialCommitment};
+use ark_ff::{biginteger::BigInteger256, Field, FromBytes, PrimeField};
 use ark_relations::{lc, r1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError}};
 use blake2::Blake2s;
 use hex::{encode, decode};
@@ -145,22 +146,20 @@ pub fn field_encode_convert(raw_vec: &[u8]) -> Vec<u8> {
     return field_encode;
 }
 
-#[no_mangle]
-pub extern "C" fn generate_proof_echain(mu: u32, sigma: u32, data: u32) -> ProofAndVerifyKey {
-    
-    let rng = &mut ark_std::test_rng();
+// Given corresponding universal reference string and circuit,
+// generating the zero knowledge proof and the verify key.
+fn geneate_proof_and_verify_key<F, PC, C, R> (
+    index: fn(&UniversalSRS<F,PC>, C)->Result<(IndexProverKey<F, PC>, IndexVerifierKey<F, PC>), Error<PC::Error>>,
+    prove: fn(&IndexProverKey<F,PC>, C, &mut R)->Result<Proof<F, PC>, Error<PC::Error>>,
+    srs: &UniversalSRS<F, PC>, c: C, zk_rand: &mut R) -> ProofAndVerifyKey  
+where F: PrimeField,
+      PC: PolynomialCommitment<F, DensePolynomial<F>>, 
+      C: ConstraintSynthesizer<F>+Clone, 
+      R: RngCore,
+      {
+    let (index_pk, index_vk) = index(srs, c.clone()).unwrap();
 
-    let universal_srs = MarlinInst::universal_setup(NUM_CONSTRAINTS, NUM_VARIABLES, NUM_VARIABLES, rng).unwrap();
-    let circ = DataQualityCircuit {
-        mu: Some(Fr::from(mu as u128)),
-        sigma: Some(Fr::from(sigma as u128)),
-        data_quality: Some(Fr::from(data as u128)),
-        num_constraints: NUM_CONSTRAINTS,
-        num_variables: NUM_VARIABLES,
-    };
-    let (index_pk, index_vk) = MarlinInst::index(&universal_srs, circ.clone()).unwrap();
-
-    let proof = MarlinInst::prove(&index_pk, circ, rng).unwrap();
+    let proof = prove(&index_pk, c, zk_rand).unwrap();
     let mut vec_proof: Vec<u8> = Vec::new();
     proof.serialize(&mut vec_proof).unwrap();
     let box_vec_proof_in_hex = CString::new(encode(vec_proof)).unwrap();
@@ -171,6 +170,24 @@ pub extern "C" fn generate_proof_echain(mu: u32, sigma: u32, data: u32) -> Proof
         proof: box_vec_proof_in_hex.into_raw(),
         verify_key: box_vec_vk_in_hex.into_raw(), 
     }
+}
+
+#[no_mangle]
+pub extern "C" fn generate_proof_echain(mu: u32, sigma: u32, data: u32) -> ProofAndVerifyKey {
+    
+    let rng = &mut ark_std::rand::rngs::OsRng;
+
+    let universal_srs = MarlinInst::universal_setup(NUM_CONSTRAINTS, NUM_VARIABLES, NUM_VARIABLES, rng).unwrap();
+    let circ = DataQualityCircuit {
+        mu: Some(Fr::from(mu as u128)),
+        sigma: Some(Fr::from(sigma as u128)),
+        data_quality: Some(Fr::from(data as u128)),
+        num_constraints: NUM_CONSTRAINTS,
+        num_variables: NUM_VARIABLES,
+    };
+    geneate_proof_and_verify_key(MarlinInst::index, MarlinInst::prove, 
+        &universal_srs, circ, rng
+    )
 }
 
 #[no_mangle]

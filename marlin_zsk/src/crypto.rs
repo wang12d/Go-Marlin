@@ -214,19 +214,9 @@ pub extern "C" fn generate_proof_zebralancer_rewarding(
         let rng = &mut ark_std::rand::rngs::OsRng;
         let universal_srs = MarlinInst::universal_setup(circuit.num_constraints, circuit.num_variables, 
             circuit.num_variables, rng).unwrap();
-        let (index_pk, index_vk) = MarlinInst::index(&universal_srs, circuit.clone()).unwrap();
-        // Now generates the marlin zsk proof
-        let proof = MarlinInst::prove(&index_pk, circuit, rng).unwrap();
-        let mut vec_proof: Vec<u8> = Vec::new();
-        proof.serialize(&mut vec_proof).unwrap();
-        let box_vec_proof_in_hex = CString::new(encode(vec_proof)).unwrap();
-        let mut vec_vk = Vec::new();
-        index_vk.serialize(&mut vec_vk).unwrap();
-        let box_vec_vk_in_hex = CString::new(encode(vec_vk)).unwrap();
-        ProofAndVerifyKey {
-            proof: box_vec_proof_in_hex.into_raw(),
-            verify_key: box_vec_vk_in_hex.into_raw(), 
-        }
+        geneate_proof_and_verify_key(MarlinInst::index, MarlinInst::prove, 
+            &universal_srs, circuit, rng
+        )
 }
 
 #[no_mangle]

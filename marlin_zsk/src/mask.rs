@@ -34,27 +34,16 @@ impl <F: Field> ConstraintSynthesizer<F> for DataMaskCircuit<F> {
 
 #[no_mangle] // generate_proof_mask generate the zero-knowledge-proof key and 
 pub extern "C" fn generate_proof_mask(v: u64, m: u64, m_v: u64) -> ProofAndVerifyKey {
-    let rng = &mut ark_std::rand::thread_rng();
+    let rng = &mut ark_std::rand::rngs::OsRng;
     let mask_circuit = DataMaskCircuit {
         v: Some(Fr::from(v)), 
         m: Some(Fr::from(m)),
         m_v: Some(Fr::from(m_v)),
     };
     let universal_srs = MarlinInst::universal_setup(1, 4, 9, rng).unwrap();
-
-    let (index_pk, index_vk) = MarlinInst::index(&universal_srs, mask_circuit.clone()).unwrap();
-
-    let proof = MarlinInst::prove(&index_pk, mask_circuit, rng).unwrap();
-    let mut vec_proof: Vec<u8> = Vec::new();
-    proof.serialize(&mut vec_proof).unwrap();
-    let box_vec_proof_in_hex = CString::new(encode(vec_proof)).unwrap();
-    let mut vec_vk = Vec::new();
-    index_vk.serialize(&mut vec_vk).unwrap();
-    let box_vec_vk_in_hex = CString::new(encode(vec_vk)).unwrap();
-    ProofAndVerifyKey {
-        proof: box_vec_proof_in_hex.into_raw(),
-        verify_key: box_vec_vk_in_hex.into_raw(), 
-    }
+    geneate_proof_and_verify_key(MarlinInst::index, MarlinInst::prove, 
+        &universal_srs, mask_circuit, rng
+    )
 }
 
 #[no_mangle]
