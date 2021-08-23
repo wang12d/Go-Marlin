@@ -30,6 +30,10 @@ mod crypto;
 
 mod crypto_test;
 
+mod mask;
+
+mod mask_test;
+
 #[repr(C)]
 pub struct ProofAndVerifyKey {
     pub proof: *const c_char,
