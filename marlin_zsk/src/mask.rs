@@ -5,15 +5,12 @@
  * added masked without reveavling any information about v and m.
  */
 use crate::*;
-use ark_poly_commit::PCUniversalParams;
 
 #[derive(Copy, Clone)]
 pub struct DataMaskCircuit<F: Field> {
     pub v: Option<F>,
     pub m: Option<F>,
     pub m_v: Option<F>,
-    pub offset: Option<F>,
-    pub m_offset: Option<F>,
 }
 
 impl <F: Field> ConstraintSynthesizer<F> for DataMaskCircuit<F> {
@@ -25,21 +22,12 @@ impl <F: Field> ConstraintSynthesizer<F> for DataMaskCircuit<F> {
         let w1 = cs.new_witness_variable(|| self.v.ok_or(SynthesisError::AssignmentMissing))?;
         let w2 = cs.new_witness_variable(|| self.m.ok_or(SynthesisError::AssignmentMissing))?;
         let w3 = cs.new_witness_variable(|| Ok(F::one()))?;
-        let w4 = cs.new_witness_variable(|| self.offset.ok_or(SynthesisError::AssignmentMissing))?;
-        let w5 = cs.new_witness_variable(|| self.m_offset.ok_or(SynthesisError::AssignmentMissing))?;
         let p1 = cs.new_input_variable(|| self.m_v.ok_or(SynthesisError::AssignmentMissing))?;
 
         // Now adding the constraint information
         cs.enforce_constraint(lc!() + (F::one(), w1) + (F::one(), w2), 
                               lc!() + (F::one(), w3), 
                               lc!() + (F::one(), p1))?;
-        cs.enforce_constraint(lc!() + (F::one(), w1) + (F::one(), w4), 
-                              lc!() + (F::one(), w3), 
-                              lc!() + (F::one(), w5))?;
-        // cs.enforce_constraint(lc!() + (F::one(), w2) + (F::one(), w5), 
-        //                       lc!() + (F::one(), w3), 
-        //                       lc!() + (F::one(), p1) + (F::one(), w4))?;
-        
         Ok(())
     }
 }
@@ -51,10 +39,8 @@ pub extern "C" fn generate_proof_mask(v: u64, m: u64, m_v: u64) -> ProofAndVerif
         v: Some(Fr::from(v)), 
         m: Some(Fr::from(m)),
         m_v: Some(Fr::from(m_v)),
-        offset: Some(Fr::from(3)),
-        m_offset: Some(Fr::from(v+3)),
     };
-    let universal_srs = MarlinInst::universal_setup(2, 6, 6, rng).unwrap();
+    let universal_srs = MarlinInst::universal_setup(1, 4, 9, rng).unwrap();
 
     let (index_pk, index_vk) = MarlinInst::index(&universal_srs, mask_circuit.clone()).unwrap();
 
