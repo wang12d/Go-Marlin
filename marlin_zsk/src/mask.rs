@@ -76,7 +76,7 @@ impl <F: Field> ConstraintSynthesizer<F> for DataMaskBatchCircuit<F> {
     }
 }
 
-#[no_mangle] // generate_proof_mask generate the zero-knowledge-proof key and 
+#[no_mangle] // generate_proof_mask generate the zero-knowledge-proof key and  verify key
 pub extern "C" fn generate_proof_mask(v: u64, m: u64, m_v: u64) -> ProofAndVerifyKey {
     let rng = &mut ark_std::rand::rngs::OsRng;
     let mask_circuit = DataMaskCircuit {

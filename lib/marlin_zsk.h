@@ -1,17 +1,19 @@
 #include <stdbool.h>
+#include <stdint.h>
 
-typedef struct {
+typedef unsigned long long ull;
+typedef struct ProofAndVerifyKey {
     const char* proof;
     const char* vk;
 } ProofAndVerifyKey;
 
-typedef struct {
+typedef struct ZebraLancerWitness {
     const char* sk;
     const char* pk;
     const char* cert;
 } ZebraLancerWitness;
 
-typedef struct {
+typedef struct DataEvaluationResult {
     unsigned int add;
     unsigned int minus;
 } DataEvaluationResult;
@@ -40,3 +42,17 @@ generate_proof_zebralancer_rewarding(unsigned int mu, unsigned int sigma, unsign
 bool
 verify_proof_zebralancer_rewarding(DataEvaluationResult* eval, unsigned int size,
     const char** ciphertext, const char* proof, const char* vk);
+
+ProofAndVerifyKey
+generate_proof_mask(ull value, ull mask, ull masked_value);
+
+bool
+verify_proof_mask(ull masked_value, const char* proof, const char* verify_key);
+
+ProofAndVerifyKey
+generate_proof_batch_mask(ull* values, ull* masks, 
+        ull* masked_values, ull number_of_elements);
+
+bool
+verify_proof_batch_mask(ull* masked_values, ull number_of_elements, 
+    const char* proof, const char* vk);
