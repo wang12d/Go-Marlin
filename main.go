@@ -74,4 +74,12 @@ func main() {
 	proof, vk = marlin.ZebraLancerGenerateProofAndVerifyKeyRewarding(0, 25, []uint{100}, publicKeyPem, privateKeyPem, [][]byte{encryptedData}, data)
 
 	fmt.Printf("Rewarding verify result: %v\n", marlin.ZebraLancerVerifyProofKeyRewarding([]marlin.EvaluationResults{{25, 175}}, [][]byte{encryptedData}, proof, vk))
+
+	values := []uint64{24, 25, 26, 27, 29}
+	masks := []uint64{50, 100, 23, 42, 42}
+	maskedValues := []uint64{74, 125, 49, 69, 71}
+
+	proof, vk = marlin.GenerateProofBatckMask(values, masks, maskedValues)
+
+	fmt.Printf("Verify batch result: %v\n", marlin.VerifyProofBatchMask(maskedValues, proof, vk))
 }

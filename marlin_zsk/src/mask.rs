@@ -7,6 +7,8 @@
 use crate::*;
 use std::marker::PhantomData;
 use std::convert::From;
+use std::slice;
+use libc::size_t;
 
 #[derive(Copy, Clone)]
 pub struct DataMaskCircuit<F: Field> {
@@ -74,7 +76,7 @@ impl <F: Field> ConstraintSynthesizer<F> for DataMaskBatchCircuit<F> {
     }
 }
 
-#[no_mangle] // generate_proof_mask generate the zero-knowledge-proof key and 
+#[no_mangle] // generate_proof_mask generate the zero-knowledge-proof key and  verify key
 pub extern "C" fn generate_proof_mask(v: u64, m: u64, m_v: u64) -> ProofAndVerifyKey {
     let rng = &mut ark_std::rand::rngs::OsRng;
     let mask_circuit = DataMaskCircuit {
@@ -101,18 +103,21 @@ pub extern "C" fn verify_proof_mask(m_v: u64, proof: *const c_char, vk: *const c
 }
 
 #[no_mangle]
-pub fn generate_proof_batch_mask(values: Vec<u64>, 
-    masks: Vec<u64>, masked_values: Vec<u64>) -> ProofAndVerifyKey {
+pub extern "C" fn generate_proof_batch_mask(values: *const u64,  
+    masks: *const u64, masked_values: *const u64, number_of_elements: size_t) -> ProofAndVerifyKey {
     let rng = &mut ark_std::rand::rngs::OsRng;
+    let values_vec = unsafe { slice::from_raw_parts(values, number_of_elements) };
+    let masks_vec = unsafe { slice::from_raw_parts(masks, number_of_elements) };
+    let masked_values = unsafe { slice::from_raw_parts(masked_values, number_of_elements) };
     let mask_circuit = DataMaskBatchCircuit {
-        values: values.clone(),
-        masks: masks,
-        masked_values: masked_values,
+        values: values_vec.to_vec(),
+        masks: masks_vec.to_vec(),
+        masked_values: masked_values.to_vec(),
         _marker: PhantomData::<Fr>,
     };
 
-    let universal_srs = MarlinInst::universal_setup(values.len(), 
-            3*values.len()+1, 12*values.len(), rng).unwrap();
+    let universal_srs = MarlinInst::universal_setup(number_of_elements, 
+            3*number_of_elements+1, 12*number_of_elements, rng).unwrap();
 
     geneate_proof_and_verify_key(MarlinInst::index, MarlinInst::prove, 
         &universal_srs, mask_circuit, rng
@@ -120,7 +125,7 @@ pub fn generate_proof_batch_mask(values: Vec<u64>,
 }
 
 #[no_mangle]
-pub fn verify_proof_batch_mask(m_v: Vec<u64>, proof: *const c_char, vk: *const c_char) -> bool {
+pub extern "C" fn verify_proof_batch_mask(m_v: *const u64, number_of_elements: size_t, proof: *const c_char, vk: *const c_char) -> bool {
     let rng = &mut ark_std::rand::rngs::OsRng;
     let proof_cstr = unsafe {CStr::from_ptr(proof)};
     let proof_decode = decode(proof_cstr.to_str().unwrap()).unwrap();
@@ -129,6 +134,7 @@ pub fn verify_proof_batch_mask(m_v: Vec<u64>, proof: *const c_char, vk: *const c
     let vk_decode = decode(vk_cstr.to_str().unwrap()).unwrap();
     let vk = IndexVerifierKey::deserialize(&vk_decode[..]).unwrap();
 
+    let m_v = unsafe { slice::from_raw_parts(m_v, number_of_elements) };
     let mut pub_inputs: Vec<_> = vec![];
     for mv in m_v.iter() {
         pub_inputs.push(Fr::from(*mv));

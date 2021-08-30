@@ -10,16 +10,6 @@ import (
 	"log"
 )
 
-const (
-	minimumParameters = 2
-)
-
-type Proof []byte // The proof generate by marlin
-
-type VerifyKey []byte // The verify key of the proof
-
-type EvaluationResults [2]uint // The data evaluation results
-
 // EChainGenerateProofAndVerifyKey generates zsk proof of the data quality evaluation result
 // which is out_1 = data - mu - 3*sigmaSquare and out_2 = data - mu + 3*sigmaSquare.
 // Others can verify whether the result is correct by using the generated proof and verify key
