@@ -175,7 +175,7 @@ impl <F: Field> ConstraintSynthesizer<F> for CryptoCircuit<F> {
 pub extern "C" fn generate_proof_zebralancer_rewarding(
     mu: usize, sigma: usize, data_qualities: *const usize, size: usize, public_key: *const c_char, private_key: *const c_char, 
             encrypted_data: *const *const c_char, raw_data: *const *const c_char) -> ProofAndVerifyKey {
-        let field_bytes = 32; let data_size = 2048; let field_size = 256;
+        let field_bytes = 32; let data_size = 2048; let field_size = 256;   // Convert the encrypted 2048 bits data into each of 256 bits number
         let num_constraints = { // The number of constraints for encrypted data equality
             let res = data_size / field_size;
             if data_size % field_size == 0 {
@@ -222,7 +222,7 @@ pub extern "C" fn generate_proof_zebralancer_rewarding(
 pub extern "C" fn verify_proof_zebralancer_rewarding(
     evaluations: *const DataEvaluationResults, size: usize, ciphertext: *const *const c_char,
     proof: *const c_char, vk: *const c_char) -> bool {
-    let rng = &mut ark_std::test_rng();
+    let rng = &mut ark_std::rand::rngs::OsRng;
     let proof = {
         let proof_cstr = unsafe {CStr::from_ptr(proof)};
         let proof_decode = decode(proof_cstr.to_str().unwrap()).unwrap();                

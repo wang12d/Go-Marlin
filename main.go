@@ -71,9 +71,9 @@ func main() {
 	)
 
 	encryptedData, _ := rsa.EncryptOAEP(sha512.New(), &DummyReader{}, &privateKey.PublicKey, data[0], nil)
-	proof, vk = marlin.ZebraLancerGenerateProofAndVerifyKeyRewarding(0, 25, []uint{100}, publicKeyPem, privateKeyPem, [][]byte{encryptedData}, data)
+	proof, vk = marlin.GenerateEncryptionZKProofAndVerifyKey(0, 25, []uint{100}, publicKeyPem, privateKeyPem, [][]byte{encryptedData}, data)
 
-	fmt.Printf("Rewarding verify result: %v\n", marlin.ZebraLancerVerifyProofKeyRewarding([]marlin.EvaluationResults{{25, 175}}, [][]byte{encryptedData}, proof, vk))
+	fmt.Printf("Rewarding verify result: %v\n", marlin.VerifyEncryptionZKProof([]marlin.EvaluationResults{{25, 175}}, [][]byte{encryptedData}, proof, vk))
 
 	values := []uint64{24, 25, 26, 27, 29}
 	masks := []uint64{50, 100, 23, 42, 42}
