@@ -4,7 +4,7 @@ package marlin
 // #include <stdbool.h>
 // #include <stdlib.h>
 // #include "./../lib/marlin_zsk.h"
-// DataEvaluationResult newDataEvaluationResult(unsigned int add, unsigned int minus) {
+// DataEvaluationResult newDataEvaluationResult(unsigned long add, unsigned long minus) {
 //		return (DataEvaluationResult) {add, minus};
 // }
 import "C"
@@ -52,7 +52,7 @@ func ZebraLancerVerifyProof(t1, t2 []byte, proof Proof, verifyKey VerifyKey) boo
 
 // GenerateEncryptionZKProofAndVerifyKey generates the zero-knowledge proof of encrypted data
 func GenerateEncryptionZKProofAndVerifyKey(mu, sigmaSquare uint, data []uint,
-	publicKey, privateKey []byte, encryptedData, rawData [][]byte) (proof Proof, verifyKey VerifyKey) {
+	publicKey, privateKey []byte, encryptedData, rawData [][]byte, dataSize uint) (proof Proof, verifyKey VerifyKey) {
 	/****************************************
 			Convert to C String
 	****************************************/
@@ -68,7 +68,7 @@ func GenerateEncryptionZKProofAndVerifyKey(mu, sigmaSquare uint, data []uint,
 	}
 
 	proofAndKey := C.generate_proof_zebralancer_rewarding(C.uint(mu), C.uint(sigmaSquare), &uData[0], C.uint(size),
-		hexPublicKey, hexPrivateKey, &hexEncryptedData[0], &hexRawData[0])
+		hexPublicKey, hexPrivateKey, &hexEncryptedData[0], &hexRawData[0], C.uint(dataSize))
 	defer C.free_proof_and_verify(proofAndKey.proof, proofAndKey.vk)
 	encodedProof, encodedVerifyKey := C.GoString(proofAndKey.proof), C.GoString(proofAndKey.vk)
 	var err error
@@ -90,7 +90,7 @@ func VerifyEncryptionZKProof(evals []EvaluationResults, ciphertext [][]byte, pro
 	dataEvals := make([]C.DataEvaluationResult, size)
 	hexCiphertext := make([]*C.char, size)
 	for i := 0; i < size; i++ {
-		dataEvals[i] = C.newDataEvaluationResult(C.uint(evals[i][0]), C.uint(evals[i][1]))
+		dataEvals[i] = C.newDataEvaluationResult(C.ulong(evals[i][0]), C.ulong(evals[i][1]))
 		hexCiphertext[i] = C.CString(hex.EncodeToString(ciphertext[i]))
 	}
 	hexProof := C.CString(hex.EncodeToString(proof))

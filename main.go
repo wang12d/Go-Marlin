@@ -53,7 +53,8 @@ func main() {
 	        Zebralacner Rewarding Verification
 	************************************************************/
 	data := [][]byte{[]byte("hello")}
-	privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+	dataSize := 8192
+	privateKey, _ := rsa.GenerateKey(rand.Reader, dataSize)
 	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
 	privateKeyPem := pem.EncodeToMemory(
 		&pem.Block{
@@ -71,9 +72,9 @@ func main() {
 	)
 
 	encryptedData, _ := rsa.EncryptOAEP(sha512.New(), &DummyReader{}, &privateKey.PublicKey, data[0], nil)
-	proof, vk = marlin.GenerateEncryptionZKProofAndVerifyKey(0, 25, []uint{100}, publicKeyPem, privateKeyPem, [][]byte{encryptedData}, data)
+	proof, vk = marlin.GenerateEncryptionZKProofAndVerifyKey(0, 25, []uint{100}, publicKeyPem, privateKeyPem, [][]byte{encryptedData}, data, uint(dataSize))
 
-	fmt.Printf("Rewarding verify result: %v\n", marlin.VerifyEncryptionZKProof([]marlin.EvaluationResults{{25, 175}}, [][]byte{encryptedData}, proof, vk))
+	fmt.Printf("Rewarding verify result: %v\n", marlin.VerifyEncryptionZKProof([]marlin.EvaluationResults{{175, 25}}, [][]byte{encryptedData}, proof, vk))
 
 	values := []uint64{24, 25, 26, 27, 29}
 	masks := []uint64{50, 100, 23, 42, 42}

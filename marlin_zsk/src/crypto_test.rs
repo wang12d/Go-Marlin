@@ -67,7 +67,7 @@ SDBwSyWcJQiMNGKujV4cU2BPcikqpukmMh1pewDMy7cRggheClGkmZI=
     let data_qualities = vec![100];
     let pv = generate_proof_zebralancer_rewarding(0, 25, data_qualities.as_ptr(), size,
         encoded_public_key.as_ptr(), encoded_private_key.as_ptr(), 
-        encoded_enc_data.as_ptr(), encoded_raw_data.as_ptr());
+        encoded_enc_data.as_ptr(), encoded_raw_data.as_ptr(), 2048);
     // Get proof and vk
     let eval = vec![DataEvaluationResults{add:175, minus:25,}];
     let vfy = verify_proof_zebralancer_rewarding(eval.as_ptr(), size, encoded_enc_data.as_ptr(), pv.proof, pv.verify_key);
@@ -148,7 +148,7 @@ SDBwSyWcJQiMNGKujV4cU2BPcikqpukmMh1pewDMy7cRggheClGkmZI=
     let data_qualities = vec![100, 75];
     let pv = generate_proof_zebralancer_rewarding(0, 25, data_qualities.as_ptr(), size,
         encoded_public_key.as_ptr(), encoded_private_key.as_ptr(), 
-        encoded_enc_data.as_ptr(), encoded_raw_data.as_ptr());
+        encoded_enc_data.as_ptr(), encoded_raw_data.as_ptr(), 2048);
     // Get proof and vk
     let evals = vec![DataEvaluationResults{add:175, minus:25,}, DataEvaluationResults{add: 150, minus: 0}];
     let vfy = verify_proof_zebralancer_rewarding(evals.as_ptr(), size, encoded_enc_data.as_ptr(), pv.proof, pv.verify_key);
