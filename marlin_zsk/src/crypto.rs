@@ -33,7 +33,7 @@ struct CryptoCircuit<F: Field> {
     raw_data: Vec<Vec<u8>>,       // The bytes of raw data
     public_key: Vec<u8>,     // The bytes of rsa public key, with key size 2048 bits
     private_key: Vec<u8>,   // The bytes of rsa private key
-    data_qualities: Vec<usize>,
+    data_qualities: Vec<u32>,
     sigma: Option<F>,
     mu: Option<F>,
     num_constraints: usize,
@@ -173,7 +173,7 @@ impl <F: Field> ConstraintSynthesizer<F> for CryptoCircuit<F> {
 
 #[no_mangle]
 pub extern "C" fn generate_proof_zebralancer_rewarding(
-    mu: usize, sigma: usize, data_qualities: *const usize, size: usize, public_key: *const c_char, private_key: *const c_char, 
+    mu: usize, sigma: usize, data_qualities: *const u32, size: usize, public_key: *const c_char, private_key: *const c_char, 
             encrypted_data: *const *const c_char, raw_data: *const *const c_char, data_size: usize) -> ProofAndVerifyKey {
         let field_bytes = 32; let field_size = 256;   // Convert the encrypted 2048 bits data into each of 256 bits number
         let num_constraints = { // The number of constraints for encrypted data equality
