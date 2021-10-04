@@ -32,7 +32,7 @@ mod go_marlin {
             cert: cert.as_ptr(),
         };
         let pg = generate_proof_zebralancer(prefix.as_ptr(), msg.as_ptr(), mpk.as_ptr(), t1.as_ptr(), t2.as_ptr(), zebralancer_witness);
-        let result = verify_proof_zebralancer(t1.as_ptr(), t2.as_ptr(), pg.proof, pg.verify_key);
+        let result = verify_proof_zebralancer(prefix.as_ptr(), msg.as_ptr(), mpk.as_ptr(), t1.as_ptr(), t2.as_ptr(), pg.proof, pg.verify_key);
         assert_eq!(result, true);
     }
 }
