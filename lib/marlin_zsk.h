@@ -14,8 +14,8 @@ typedef struct ZebraLancerWitness {
 } ZebraLancerWitness;
 
 typedef struct DataEvaluationResult {
-    unsigned long add;
-    unsigned long minus;
+    ull add;
+    ull minus;
 } DataEvaluationResult;
 
 ProofAndVerifyKey
@@ -23,7 +23,7 @@ generate_proof_echain(unsigned int mu, unsigned int sigma, unsigned int data);
 
 
 bool 
-verify_proof_echain(unsigned int out_one, unsigned int out_two, const char* proof, const char* verify_key);
+verify_proof_echain(ull out_one, ull out_two, const char* proof, const char* verify_key);
 
 void
 free_proof_and_verify(const char* proof, const char* verify_key);
@@ -33,7 +33,7 @@ generate_proof_zebralancer(const char* prefix, const char* msg,
     const char* mpk, const char* t1, const char* t2, ZebraLancerWitness witness);
 
 bool
-verify_proof_zebralancer(const char* t1, const char* t2, const char* proof, const char* vk);
+verify_proof_zebralancer(const char* prefix, const char* msg, const char* mpk, const char* t1, const char* t2, const char* proof, const char* vk);
 
 ProofAndVerifyKey
 generate_proof_zebralancer_rewarding(unsigned int mu, unsigned int sigma, unsigned int* data, unsigned int size,

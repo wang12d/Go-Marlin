@@ -32,10 +32,10 @@ func (dr *DummyReader) Read(p []byte) (n int, err error) {
 
 func main() {
 	proof, vk := marlin.EChainGenerateProofAndVerifyKey(0, 25, 100)
-	fmt.Printf("verify result: %v\n", marlin.EChainVerify(proof, vk, 25, 175))
-	fmt.Printf("verify result: %v\n", marlin.EChainVerify(proof, vk, 23, 175))
-	fmt.Printf("verify result: %v\n", marlin.EChainVerify(proof, vk, 25, 174))
-	fmt.Printf("verify result: %v\n", marlin.EChainVerify(proof, vk, 22, 170))
+	fmt.Printf("verify result: %v\n", marlin.EChainVerify(proof, vk, marlin.EvaluationResults{175, 25}))
+	fmt.Printf("verify result: %v\n", marlin.EChainVerify(proof, vk, marlin.EvaluationResults{175, 23}))
+	fmt.Printf("verify result: %v\n", marlin.EChainVerify(proof, vk, marlin.EvaluationResults{174, 25}))
+	fmt.Printf("verify result: %v\n", marlin.EChainVerify(proof, vk, marlin.EvaluationResults{170, 22}))
 
 	pk := decode("e94647fef85a6d647904a7ae6433dfacb19e7ac610a7bb901c899d63856a1509")
 	sk := decode("74892dc16d86e99ba5cdf9262232b67e4b2c7d2d00d302f35c2108be33db4c50e94647fef85a6d647904a7ae6433dfacb19e7ac610a7bb901c899d63856a1509")
@@ -46,14 +46,14 @@ func main() {
 	t2 := decode("deddaf119e6e47a1a0c5824bd540ee8e6b880f1297523225c101eb75a160e2a8")
 
 	proof, vk = marlin.ZebraLancerGenerateProofAndVerifyKey(prefix, msg, sk, pk, cert, mpk, t1, t2)
-	fmt.Printf("ZebraLancer verify result: %v\n", marlin.ZebraLancerVerifyProof(t1, t2, proof, vk))
+	fmt.Printf("ZebraLancer verify result: %v\n", marlin.ZebraLancerVerifyProof(prefix, msg, mpk, t1, t2, proof, vk)) // Should be true
 	t1[0] = t1[0] - 1
-	fmt.Printf("ZebraLancer verify result: %v\n", marlin.ZebraLancerVerifyProof(t1, t2, proof, vk))
+	fmt.Printf("ZebraLancer verify result: %v\n", marlin.ZebraLancerVerifyProof(prefix, msg, mpk, t1, t2, proof, vk)) // Should be false
 	/************************************************************
 	        Zebralacner Rewarding Verification
 	************************************************************/
 	data := [][]byte{[]byte("hello")}
-	dataSize := 8192
+	dataSize := 2048
 	privateKey, _ := rsa.GenerateKey(rand.Reader, dataSize)
 	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
 	privateKeyPem := pem.EncodeToMemory(
