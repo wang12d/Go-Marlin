@@ -1,7 +1,8 @@
 use crate::*;
-use ed25519_dalek::{Signature, Verifier, PublicKey, Keypair};
-use std::convert::TryInto;
-use sha2::Sha256;
+use rsa::{RSAPublicKey, padding::PaddingScheme, PublicKey as rsaPublicKey};
+use ed25519_dalek::{PublicKey, Keypair};
+use std::convert::{TryFrom};
+use sha2::{Sha256, Digest};
 use crate::utils::convert_bytes_to_field_elements;
 use hmac::{Hmac, NewMac, Mac};
 
@@ -42,8 +43,10 @@ impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for ZebraLancerCircu
         cs: ConstraintSystemRef<ConstraintF>,
     ) -> Result<(), SynthesisError> {
         let one = cs.new_input_variable(|| Ok(ConstraintF::one()))?;
-        let cert = Signature::new(self.cert.try_into().unwrap());
-        let mpk = PublicKey::from_bytes(&self.mpk[..]).unwrap();
+        let mpk = {
+            let pem = rsa::pem::parse(&self.mpk).unwrap();
+            RSAPublicKey::try_from(pem).expect("failed to convert pem to RSA public key")
+        };
         let field_mpk_witness_variable: Vec<_> =  {
             let field_mpk_elements = convert_bytes_to_field_elements::<ConstraintF>(&self.mpk, self.field_size);
             field_mpk_elements.into_iter().map(|f| cs.new_witness_variable(|| Ok(f)).unwrap()).collect()   // Convert bytes to number for comparsion
@@ -68,8 +71,18 @@ impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for ZebraLancerCircu
         }
 
         let w1 = {  // The verification of digital signature
-            mpk.verify(&self.pk[..], &cert).unwrap(); // Unit if success verify the result
-            Some(ConstraintF::one())
+            let mut h = Sha256::new();
+            h.update(&self.pk);
+            let digest = h.finalize();
+            let padding = PaddingScheme::PKCS1v15Sign{
+                hash: Some(rsa::Hash::SHA2_256),
+            };
+            let res = mpk.verify(padding, &digest, &self.cert[..]); // Unit if success verify the result
+            if res.is_ok() {
+                Some(ConstraintF::one())
+            } else {
+                Some(ConstraintF::zero())
+            }
         };
         let w1 = cs.new_witness_variable(|| w1.ok_or(SynthesisError::AssignmentMissing))?;
         let pk = PublicKey::from_bytes(&self.pk[..]).unwrap();
