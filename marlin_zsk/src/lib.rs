@@ -35,6 +35,8 @@ mod mask;
 
 mod mask_test;
 
+mod utils;
+
 #[repr(C)]
 pub struct ProofAndVerifyKey {
     pub proof: *const c_char,
@@ -140,7 +142,14 @@ pub fn convert_c_hexstr_to_bytes(encoded_c_str: *const c_char) -> Vec<u8> {
 // Convert bytes encoded big integer 256 to ark-workers BigInteger256,
 // then converts encoded the BigInteger256 to bytes
 pub fn field_encode_convert(raw_vec: &[u8]) -> Vec<u8> {
-    let fr_element = Fr::new(BigInteger256::read(raw_vec).unwrap());
+    let mut bytes = raw_vec.to_vec();
+    if bytes.len() < 32 {
+        let zeros = vec![0 as u8; 32-bytes.len()];
+        bytes.reverse();
+        bytes = bytes.into_iter().chain(zeros).collect();
+        bytes.reverse();
+    }
+    let fr_element = Fr::new(BigInteger256::read(&bytes[..]).unwrap());
     let mut field_encode = Vec::new();
     fr_element.serialize(&mut field_encode).unwrap();
     return field_encode;

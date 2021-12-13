@@ -29,12 +29,8 @@ func EChainGenerateProofAndVerifyKey(mu, sigmaSquare, data uint) (proof Proof, v
 
 // EChainVerify verify the computed result using proof and verify key along with public
 // inputs. The result is true if the result is indeed computed as specified.
-func EChainVerify(proof Proof, verifyKey VerifyKey, publicInputs ...uint) bool {
-	if len(publicInputs) < minimumParameters {
-		println("Requiring at least ", minimumParameters, " parameters!")
-		return false
-	}
+func EChainVerify(proof Proof, verifyKey VerifyKey, eval EvaluationResults) bool {
 	proofHex, verifyKeyHex := C.CString(hex.EncodeToString(proof)), C.CString(hex.EncodeToString(verifyKey))
-	verifyResult := C.verify_proof_echain(C.uint(publicInputs[0]), C.uint(publicInputs[1]), proofHex, verifyKeyHex)
+	verifyResult := C.verify_proof_echain(C.ulonglong(eval[0]), C.ulonglong(eval[1]), proofHex, verifyKeyHex)
 	return bool(verifyResult)
 }
